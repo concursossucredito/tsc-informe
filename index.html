@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TSC – Informe diario</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #fff; --card: #fff; --tx: #1d1d1b; --mu: #6b6a5e; --bd: #e6e2b8;
+      --y: #fff000; --ok: #137a3b; --ko: #e41e2f; --okbg: #eaf6ee; --kobg: #fde9eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--tx);
+      font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    .top {
+      background: var(--y); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 12px 20px; border-bottom: 4px solid var(--tx);
+    }
+    .top h1 { font-size: 18px; margin: 0; }
+    .top .meta { font-size: 12px; color: #333; }
+    .top .spacer { flex: 1; }
+    button, .btn {
+      border: 1px solid var(--tx); background: #fff; color: var(--tx);
+      padding: 8px 14px; border-radius: 8px; font: inherit; cursor: pointer;
+    }
+    button.primary { background: var(--tx); color: var(--y); font-weight: 600; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    main { max-width: 1040px; margin: 0 auto; padding: 16px; }
+    h2 { font-size: 16px; margin: 16px 0 8px; }
+    .g4 {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px; margin-bottom: 12px;
+    }
+    .tile {
+      background: var(--card); border: 1px solid var(--bd); border-top: 5px solid var(--y);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .tile small { color: var(--mu); font-size: 12px; display: block; }
+    .tile b { font-size: 24px; display: block; line-height: 1.15; }
+    .tile em { font-style: normal; font-size: 12px; color: var(--mu); }
+    .card {
+      background: var(--card); border: 1px solid var(--bd); border-radius: 10px;
+      padding: 14px; margin-bottom: 12px; overflow-x: auto;
+    }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border: 1px solid var(--bd); padding: 6px 9px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    thead th { background: var(--y); }
+    tr.tot td { font-weight: 700; border-top: 2px solid var(--tx); }
+    .note { color: var(--mu); font-size: 13px; }
+    .err { color: var(--ko); background: var(--kobg); padding: 10px; border-radius: 8px; }
+    .ok { color: var(--ok); }
+    #login-view {
+      max-width: 380px; margin: 48px auto; padding: 24px;
+      border: 1px solid var(--bd); border-radius: 12px; border-top: 6px solid var(--y);
+    }
+    #login-view input {
+      width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--bd);
+      border-radius: 8px; font: inherit;
+    }
+    .seg { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
+    .seg button.on { background: var(--y); border-color: var(--tx); font-weight: 600; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ========== LOGIN ========== -->
+  <div id="login-view">
+    <h1 style="margin-top:0;font-size:20px">Informe diario TSC</h1>
+    <p class="note">Ingresá con tu usuario de Supabase (solo personal autorizado).</p>
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="username" placeholder="usuario@empresa.com" />
+    <label>Contraseña</label>
+    <input id="password" type="password" autocomplete="current-password" />
+    <button class="primary" id="btnLogin" style="width:100%">Ingresar</button>
+    <p id="login-error" class="err hidden" style="margin-top:12px"></p>
+    <p class="note" style="margin-top:16px">
+      ¿Sin usuario? Pedile al administrador que te invite en Supabase Auth.
+    </p>
+  </div>
+
+  <!-- ========== APP ========== -->
+  <div id="app-view" class="hidden">
+    <header class="top">
+      <div>
+        <h1>Informe diario de resúmenes</h1>
+        <span class="meta" id="status">Sin datos</span>
+      </div>
+      <div class="spacer"></div>
+      <button type="button" class="primary" id="btnRefresh">Actualizar</button>
+      <button type="button" id="btnLogout">Salir</button>
+    </header>
+
+    <main>
+      <p class="note" id="meta-line">—</p>
+
+      <h2>Resumen del período</h2>
+      <div class="seg" id="seg-btns">
+        <button type="button" class="on" data-s="T">Total</button>
+        <button type="button" data-s="C">Cartera</button>
+        <button type="button" data-s="P">PI</button>
+      </div>
+      <div class="g4" id="tiles"></div>
+
+      <h2>Estados: inicio → hoy</h2>
+      <div class="card"><table id="tbl-estados"><thead></thead><tbody></tbody></table></div>
+
+      <h2>Mora: inicio → hoy</h2>
+      <div class="card"><table id="tbl-mora"><thead></thead><tbody></tbody></table></div>
+
+      <h2>Cobranzas (período cargado)</h2>
+      <div class="g4" id="tiles-cob"></div>
+
+      <h2>Altas (últimos períodos)</h2>
+      <div class="card"><table id="tbl-altas"><thead></thead><tbody></tbody></table></div>
+
+      <p class="note">
+        Los datos se leen directo de Supabase (sin IA). La carga desde Oracle la hacés vos con los scripts.
+      </p>
+      <p id="error-box" class="err hidden"></p>
+    </main>
+  </div>
+
+<script>
+// =============================================================================
+// CONFIG – pegá tu anon key (Project Settings → API → anon public)
+// =============================================================================
+const SUPABASE_URL = 'https://rbbkkyqgivsxajrtkoit.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJiYmtreXFnaXZzeGFqcnRrb2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MjIwMzAsImV4cCI6MjEwNzQ5ODAzMH0.FA0RM8BxhbBCxPLFCuX2uIe7ZfoQuUwsL1GS7rKTiLc'
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+const NE = { A: 'ACTIVA', F: 'ACTIVO-FIN.', M: 'MORA', B: 'BAJA', '?': '?' }
+let cache = {
+  resumen: [],
+  estados: [],
+  cobranza: null,
+  altas: [],
+  meta: null,
+}
+let seg = 'T'
+
+function fm(n) {
+  if (n == null || isNaN(n)) return '—'
+  return Number(n).toLocaleString('es-AR')
+}
+function p1(a, b) {
+  if (!b) return '—'
+  return (100 * a / b).toFixed(1).replace('.', ',') + ' %'
+}
+function show(el, on) {
+  el.classList.toggle('hidden', !on)
+}
+
+// ----- Auth -----
+async function initAuth() {
+  const { data: { session } } = await sb.auth.getSession()
+  if (session) showApp(session)
+  else showLogin()
+
+  sb.auth.onAuthStateChange((_e, session) => {
+    if (session) showApp(session)
+    else showLogin()
+  })
+}
+
+function showLogin() {
+  show(document.getElementById('login-view'), true)
+  show(document.getElementById('app-view'), false)
+}
+function showApp(session) {
+  show(document.getElementById('login-view'), false)
+  show(document.getElementById('app-view'), true)
+  document.getElementById('status').textContent =
+    (session.user.email || 'usuario') + ' · listo'
+  refrescar()
+}
+
+document.getElementById('btnLogin').onclick = async () => {
+  const email = document.getElementById('email').value.trim()
+  const password = document.getElementById('password').value
+  const err = document.getElementById('login-error')
+  show(err, false)
+  const { error } = await sb.auth.signInWithPassword({ email, password })
+  if (error) {
+    err.textContent = error.message
+    show(err, true)
+  }
+}
+document.getElementById('btnLogout').onclick = () => sb.auth.signOut()
+document.getElementById('btnRefresh').onclick = () => refrescar()
+
+document.querySelectorAll('#seg-btns button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('#seg-btns button').forEach(x => x.classList.remove('on'))
+    b.classList.add('on')
+    seg = b.dataset.s
+    renderResumen()
+    renderEstados()
+    renderMora()
+  }
+})
+
+// ----- Data -----
+async function refrescar() {
+  const st = document.getElementById('status')
+  const errBox = document.getElementById('error-box')
+  show(errBox, false)
+  st.textContent = 'Actualizando desde Supabase…'
+  document.getElementById('btnRefresh').disabled = true
+
+  try {
+    const [r1, r2, r3, r4, r5] = await Promise.all([
+      sb.from('v_informe_resumen').select('*'),
+      sb.from('v_informe_estados').select('*'),
+      sb.from('v_cobranza_resumen').select('*').maybeSingle(),
+      sb.from('v_altas_resumen').select('*').limit(8),
+      sb.from('v_meta_actualizacion').select('*').maybeSingle(),
+    ])
+
+    const errors = [r1, r2, r3, r4, r5].filter(r => r.error).map(r => r.error.message)
+    if (errors.length) throw new Error(errors.join(' | '))
+
+    cache.resumen = r1.data || []
+    cache.estados = r2.data || []
+    cache.cobranza = r3.data
+    cache.altas = r4.data || []
+    cache.meta = r5.data
+
+    renderAll()
+    const m = cache.meta
+    st.textContent = 'Actualizado ' + new Date().toLocaleString('es-AR')
+    document.getElementById('meta-line').textContent = m
+      ? `Período actual: ${fm(m.filas_periodo_actual)} cuentas · Inicio: ${fm(m.filas_periodo_inicio)} · ` +
+        `Clientes: ${fm(m.filas_clientebase)} · Últ. compra: ${m.max_fechacompra || '—'} · ` +
+        `Últ. recibo: ${m.max_fecharecibo || '—'}`
+      : '—'
+  } catch (e) {
+    errBox.textContent = 'Error al consultar: ' + e.message
+    show(errBox, true)
+    st.textContent = 'Error al actualizar'
+  } finally {
+    document.getElementById('btnRefresh').disabled = false
+  }
+}
+
+function renderAll() {
+  renderResumen()
+  renderEstados()
+  renderMora()
+  renderCobranza()
+  renderAltas()
+}
+
+function rowResumen(s) {
+  return cache.resumen.find(r => r.segmento === s) || null
+}
+
+function renderResumen() {
+  const r = rowResumen(seg) || rowResumen('T')
+  const el = document.getElementById('tiles')
+  if (!r) {
+    el.innerHTML = '<p class="note">Sin datos de resumen. ¿Corriste las vistas SQL y hay periodo_inicio/actual?</p>'
+    return
+  }
+  const T = Number(r.cuentas_inicio) || 0
+  const tiles = [
+    ['Cuentas al inicio', fm(T), seg === 'T' ? 'CARTERA + PI' : (seg === 'C' ? 'Cartera' : 'PI')],
+    ['Hoy ACTIVA', fm(r.hoy_activa), p1(r.hoy_activa, T)],
+    ['Hoy ACTIVO-FIN.', fm(r.hoy_activo_fin), p1(r.hoy_activo_fin, T)],
+    ['Hoy MORA', fm(r.hoy_mora), p1(r.hoy_mora, T)],
+    ['Hoy BAJA', fm(r.hoy_baja), p1(r.hoy_baja, T)],
+    ['Consumieron', fm(r.consumieron), p1(r.consumieron, T)],
+  ]
+  el.innerHTML = tiles.map(t =>
+    `<div class="tile"><small>${t[0]}</small><b>${t[1]}</b><em>${t[2]}</em></div>`
+  ).join('')
+}
+
+function renderEstados() {
+  const rows = cache.estados.filter(r => seg === 'T' || r.segmento === seg)
+  const byIni = {}
+  rows.forEach(r => {
+    const k = r.estado_inicio || '?'
+    if (!byIni[k]) byIni[k] = { t: 0, A: 0, F: 0, M: 0, B: 0 }
+    const n = Number(r.cuentas) || 0
+    byIni[k].t += n
+    const h = r.estado_hoy || '?'
+    if (byIni[k][h] != null) byIni[k][h] += n
+  })
+  const order = ['A', 'F', 'M', 'B']
+  let body = order.map(i => {
+    const x = byIni[i]
+    if (!x) return null
+    return `<tr>
+      <td>${NE[i] || i}</td>
+      <td>${fm(x.t)}</td>
+      <td>${fm(x.A)}</td><td>${fm(x.F)}</td><td>${fm(x.M)}</td><td>${fm(x.B)}</td>
+      <td>${fm(x.t - (x[i] || 0))}</td>
+    </tr>`
+  }).filter(Boolean).join('')
+
+  document.querySelector('#tbl-estados thead').innerHTML =
+    `<tr><th>Estado al inicio</th><th>Cuentas</th><th>Hoy ACTIVA</th><th>Hoy ACTIVO-FIN.</th><th>Hoy MORA</th><th>Hoy BAJA</th><th>Cambiaron</th></tr>`
+  document.querySelector('#tbl-estados tbody').innerHTML = body || '<tr><td colspan="7">Sin datos</td></tr>'
+}
+
+function renderMora() {
+  const rows = cache.estados.filter(r => seg === 'T' || r.segmento === seg)
+  const byM = {}
+  rows.forEach(r => {
+    const mi = r.mora_inicio
+    if (mi == null || mi < 0) return
+    if (!byM[mi]) byM[mi] = { t: 0, 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, B: 0 }
+    const n = Number(r.cuentas) || 0
+    byM[mi].t += n
+    if (r.estado_hoy === 'B') byM[mi].B += n
+    else {
+      const mh = r.mora_hoy
+      if (mh != null && mh >= 0 && byM[mi][mh] != null) byM[mi][mh] += n
+    }
+  })
+  const labels = ['SIN MORA', 'MORA 1', 'MORA 2', 'MORA 3', 'MORA 4', 'MORA 5']
+  const body = [0, 1, 2, 3, 4, 5].map(mi => {
+    const x = byM[mi]
+    if (!x) return null
+    return `<tr>
+      <td>${labels[mi]}</td><td>${fm(x.t)}</td>
+      ${[0,1,2,3,4,5].map(h => `<td>${fm(x[h])}</td>`).join('')}
+      <td>${fm(x.B)}</td>
+    </tr>`
+  }).filter(Boolean).join('')
+
+  document.querySelector('#tbl-mora thead').innerHTML =
+    `<tr><th>Mora al inicio</th><th>Cuentas</th>` +
+    labels.map(l => `<th>Hoy ${l}</th>`).join('') +
+    `<th>BAJA</th></tr>`
+  document.querySelector('#tbl-mora tbody').innerHTML = body || '<tr><td colspan="9">Sin datos</td></tr>'
+}
+
+function renderCobranza() {
+  const c = cache.cobranza
+  const el = document.getElementById('tiles-cob')
+  if (!c) {
+    el.innerHTML = '<p class="note">Sin datos de cobranza</p>'
+    return
+  }
+  const ar = Number(c.a_recuperar) || 0
+  const re = Number(c.recuperado) || 0
+  el.innerHTML = [
+    ['A recuperar', fm(Math.round(ar)), 'Foto cobranza'],
+    ['Recuperado', fm(Math.round(re)), p1(re, ar)],
+    ['Recibos', fm(c.cantidad_recibos), 'Movimientos'],
+    ['Cuentas que pagaron', fm(c.cuentas_que_pagaron), p1(c.pct_recupero, 100) === '—' ? (c.pct_recupero != null ? c.pct_recupero + ' %' : '') : ''],
+  ].map(t =>
+    `<div class="tile"><small>${t[0]}</small><b>${t[1]}</b><em>${t[2] || ''}</em></div>`
+  ).join('')
+}
+
+function renderAltas() {
+  const rows = cache.altas
+  document.querySelector('#tbl-altas thead').innerHTML =
+    `<tr><th>Período venta</th><th>Altas</th><th>Con uso</th><th>% uso</th></tr>`
+  document.querySelector('#tbl-altas tbody').innerHTML = rows.length
+    ? rows.map(r => `<tr>
+        <td>${r.periodoventa || '—'}</td>
+        <td>${fm(r.altas)}</td>
+        <td>${fm(r.con_uso)}</td>
+        <td>${r.pct_uso != null ? String(r.pct_uso).replace('.', ',') + ' %' : '—'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="4">Sin datos</td></tr>'
+}
+
+initAuth()
+</script>
+</body>
+</html>
