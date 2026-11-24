@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>TSC · Datawarehouse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #ffffff;
+  --bg2: #f6f7f8;
+  --bg3: #fffbea;
+  --card: #ffffff;
+  --bd: #e6e8eb;
+  --tx: #20242a;
+  --mu: #68717d;
+  --y: #ffed00;
+  --y2: #d4c500;
+  --ok: #16834a;
+  --ko: #c43d3d;
+  --info: #2867b2;
+  --radius: 14px;
+  --shadow: 0 8px 28px rgba(28,39,54,.07);
+  --font: "DM Sans", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin:0; min-height:100%; background:var(--bg); color:var(--tx); font:15px/1.45 var(--font); }
+button, input, select { font: inherit; color: inherit; }
+.hidden { display: none !important; }
+
+/* LOGIN */
+#login-view {
+  min-height: 100vh; display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255,237,0,.16), transparent),
+    var(--bg);
+  padding: 24px;
+}
+.login-card {
+  width: min(400px, 100%); background: var(--card); border:1px solid var(--bd);
+  border-radius: 20px; padding: 32px 28px; box-shadow: var(--shadow);
+}
+.login-card .brand {
+  display:flex; align-items:center; gap:12px; margin-bottom: 8px;
+}
+.login-card .mark {
+  width:40px; height:40px; border-radius:10px; background:var(--y); color:#111;
+  display:grid; place-items:center; font-weight:700; font-size:14px;
+}
+.login-card h1 { margin:0; font-size:22px; font-weight:700; letter-spacing:-.02em; }
+.login-card p.sub { margin:6px 0 24px; color:var(--mu); font-size:13px; }
+.login-card label { display:block; font-size:12px; color:var(--mu); margin-bottom:6px; }
+.login-card input {
+  width:100%; background:var(--bg2); border:1px solid var(--bd); border-radius:10px;
+  padding:12px 14px; margin-bottom:14px; outline:none;
+}
+.login-card input:focus { border-color: var(--y2); }
+.login-card button.primary {
+  width:100%; margin-top:8px; border:none; border-radius:10px; padding:12px;
+  background:var(--y); color:#111; font-weight:700; cursor:pointer;
+}
+.login-card button.primary:hover { filter:brightness(1.05); }
+.login-card .err { color:var(--ko); font-size:13px; margin-top:10px; min-height:1.2em; }
+
+/* APP SHELL */
+#app-view { min-height:100vh; display:flex; flex-direction:column; }
+.topbar {
+  position: sticky; top:0; z-index:40;
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  padding: 12px 20px;
+  background: rgba(255,255,255,.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--bd);
+}
+.topbar .brand { display:flex; align-items:center; gap:10px; min-width:160px; }
+.topbar .mark {
+  width:32px; height:32px; border-radius:8px; background:var(--y); color:#111;
+  display:grid; place-items:center; font-weight:700; font-size:12px;
+}
+.topbar h1 { margin:0; font-size:15px; font-weight:600; }
+.topbar #subtitle { color:var(--mu); font-size:12px; font-family:var(--mono); }
+.topbar .actions { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.btn {
+  border:1px solid var(--bd); background:var(--bg3); color:var(--tx);
+  border-radius:9px; padding:8px 12px; cursor:pointer; font-size:13px;
+}
+.btn:hover { border-color:#3d4a60; }
+.btn.primary { background:var(--y); color:#111; border-color:transparent; font-weight:600; }
+.btn.ghost { background:transparent; }
+
+.nav {
+  display:flex; gap:4px; padding: 10px 20px 0; overflow-x:auto;
+  border-bottom: 1px solid var(--bd);
+  background: var(--bg);
+}
+.nav button {
+  border:none; background:transparent; color:var(--mu); padding:10px 14px;
+  border-radius:10px 10px 0 0; cursor:pointer; white-space:nowrap; font-weight:500;
+  border-bottom: 2px solid transparent; margin-bottom:-1px;
+}
+.nav button:hover { color:var(--tx); background:var(--bg2); }
+.nav button.on { color:var(--tx); border-bottom-color: var(--y); }
+
+main { padding: 20px; max-width: 1400px; margin: 0 auto; width: 100%; }
+.panel { display:none; }
+.panel.on { display:block; animation: fade .25s ease; }
+@keyframes fade { from { opacity:0; transform:translateY(4px);} to { opacity:1; transform:none;} }
+
+/* KPI strip */
+.g4 {
+  display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-bottom:16px;
+}
+@media (max-width: 1000px) { .g4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .g4 { grid-template-columns: repeat(2,minmax(0,1fr)); } main { padding:12px; } .topbar { padding:10px 12px; } .nav { padding-left:10px; } .filters { position:static; } .tile { padding:11px; } .tile b { font-size:20px; } .card { padding:12px; overflow-x:auto; } table { min-width:560px; } }
+
+.tile {
+  background: var(--card); border:1px solid var(--bd); border-radius: var(--radius);
+  padding: 14px 16px; position:relative; overflow:hidden;
+}
+.tile::before {
+  content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--bd);
+}
+.tile.ok::before { background: var(--ok); }
+.tile.ko::before { background: var(--ko); }
+.tile.warn::before { background: var(--y); }
+.tile small { display:block; color:var(--mu); font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+.tile b { display:block; font-size:24px; font-weight:700; letter-spacing:-.03em; font-variant-numeric: tabular-nums; }
+.tile em { display:block; margin-top:4px; font-style:normal; color:var(--mu); font-size:12px; }
+.tile .ok, b.ok { color: var(--ok); }
+.tile .ko, b.ko { color: var(--ko); }
+tr.res td { font-weight:700; color:#6e6200; background:rgba(255,237,0,.13); border-top:1px solid var(--y2); }
+
+.card {
+  background: var(--card); border:1px solid var(--bd); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 14px;
+}
+.card h3 { margin:0 0 12px; font-size:13px; font-weight:600; color:var(--mu); text-transform:uppercase; letter-spacing:.04em; }
+
+table { width:100%; border-collapse: collapse; font-size:13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 10px; text-align:right; border-bottom:1px solid var(--bd); }
+th { color:var(--mu); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.03em; background:var(--bg2); position:sticky; top:0; }
+td:first-child, th:first-child { text-align:left; }
+tr.tot td { font-weight:600; border-top:1px solid #3d4a60; background:var(--bg3); }
+.tbl-wrap { max-height: 380px; overflow:auto; border:1px solid var(--bd); border-radius:10px; }
+
+.note { color:var(--mu); font-size:12px; margin:8px 0 0; }
+/* Conclusiones del período */
+.insight-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+.insight-card { background:var(--card); border:1px solid var(--bd); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); }
+.insight-card h3 { margin:0 0 8px; font-size:14px; }
+.insight-card p { margin:0; color:var(--mu); font-size:13px; line-height:1.55; }
+.insight-card strong { color:var(--tx); }
+.insight-card .insight-value { display:block; font-size:24px; font-weight:700; letter-spacing:-.03em; margin:5px 0; font-variant-numeric:tabular-nums; }
+.insight-card.good { border-left:4px solid var(--ok); }
+.insight-card.warn { border-left:4px solid #d28a16; }
+.insight-card.info { border-left:4px solid var(--info); }
+.insight-card.neutral { border-left:4px solid #aab1ba; }
+.insight-callout { background:#fffbea; border:1px solid #eee4a1; border-radius:var(--radius); padding:15px 17px; margin-bottom:14px; }
+.insight-callout h3 { margin:0 0 6px; font-size:14px; }
+.insight-callout p { margin:0; font-size:13px; color:#55502b; line-height:1.55; }
+.insight-list { margin:8px 0 0; padding-left:18px; color:var(--mu); font-size:13px; }
+.insight-list li { margin:5px 0; }
+@media(max-width:700px){ .insight-grid{grid-template-columns:1fr;} }
+
+.chart-wrap { position:relative; height:240px; margin:8px 0 4px; }
+
+.filters {
+  display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-bottom:14px;
+  background:var(--card); border:1px solid var(--bd); border-radius:var(--radius);
+  padding:12px 14px; position:sticky; top:56px; z-index:5;
+}
+.filters label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--mu); }
+.filters input, .filters select {
+  background:var(--bg2); border:1px solid var(--bd); border-radius:8px;
+  padding:8px 10px; min-width:130px; color:var(--tx);
+}
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+.chip {
+  border:1px solid var(--bd); background:var(--bg3); border-radius:20px;
+  padding:5px 12px; font-size:12px; cursor:pointer; color:var(--mu);
+}
+.chip.on { background:rgba(245,224,0,.15); border-color:var(--y2); color:var(--y); font-weight:600; }
+
+/* Future AI dock */
+.ai-dock {
+  position: fixed; right: 20px; bottom: 20px; z-index: 50;
+}
+.ai-dock button {
+  border:none; border-radius:999px; padding:12px 18px;
+  background:var(--y); color:#111; font-weight:700; cursor:pointer;
+  box-shadow: var(--shadow);
+}
+.ai-dock button:hover { filter:brightness(1.06); }
+.ai-panel {
+  position: fixed; right: 20px; bottom: 72px; width: min(380px, calc(100vw - 32px));
+  background: var(--card); border:1px solid var(--bd); border-radius:16px;
+  box-shadow: var(--shadow); padding:16px; z-index:50;
+}
+.ai-panel h4 { margin:0 0 8px; font-size:14px; }
+.ai-panel p { margin:0; color:var(--mu); font-size:13px; line-height:1.5; }
+
+#error-box {
+  background: rgba(255,107,107,.12); border:1px solid var(--ko); color:var(--ko);
+  padding:12px 14px; border-radius:10px; margin-bottom:14px;
+}
+
+/* Professional light dashboard */
+body { background:#fff; color:#20242a; }
+.topbar { border-bottom-color:#e8eaed; box-shadow:0 2px 12px rgba(25,35,45,.035); }
+.nav { background:#fff; border-bottom-color:#e8eaed; }
+.nav button.on { color:#20242a; border-bottom-color:#e0ce00; }
+.nav button:hover { color:#20242a; background:#f7f8f9; }
+.card, .tile, .login-card { box-shadow:0 3px 14px rgba(30,42,56,.045); }
+.tile { border-color:#e8eaed; }
+.tile::before { background:#cbd1d8; }
+.tile.good::before { background:#16834a; }
+.tile.cost::before { background:#d97706; }
+.tile.activity::before { background:#2867b2; }
+.tile b { color:#20242a; }
+.tile b.good, .metric-good { color:#16834a !important; }
+.tile b.cost, .metric-cost { color:#b76508 !important; }
+.tile b.activity, .metric-activity { color:#2867b2 !important; }
+.tile b.neutral { color:#20242a !important; }
+tr.tot td { background:#fffbea; border-top:1px solid #e5d54a; color:#252525; }
+th { background:#f6f7f8; color:#59636f; }
+tbody tr:hover td { background:#fafbfc; }
+.btn { background:#fff; border-color:#dfe3e7; color:#303841; }
+.btn.primary { background:#ffed00; color:#242424; border-color:#e7d800; }
+.filters {
+  position:sticky; top:68px; align-items:end; gap:12px; padding:16px;
+  background:rgba(255,255,255,.97); border:1px solid #e4e7eb;
+  box-shadow:0 8px 24px rgba(30,42,56,.07); backdrop-filter:blur(10px);
+}
+.filter-heading { display:flex; flex:1 0 100%; align-items:center; justify-content:space-between; gap:12px; }
+.filter-heading strong { font-size:14px; color:#20242a; }
+.filter-heading span { color:#7a838e; font-size:11px; }
+.filters label { min-width:130px; color:#59636f; font-size:11px; font-weight:600; }
+.filters label.search-filter { flex:1 1 210px; }
+.filters input, .filters select {
+  min-height:39px; min-width:140px; background:#fff; color:#20242a;
+  border:1px solid #dfe3e7; border-radius:9px; padding:9px 11px;
+  outline:none; transition:border-color .15s, box-shadow .15s;
+}
+.filters input:focus, .filters select:focus { border-color:#b5a700; box-shadow:0 0 0 3px rgba(255,237,0,.2); }
+.filters .filter-actions { display:flex; gap:8px; align-items:center; margin-left:auto; }
+.filters .btn-filter { min-height:39px; border-radius:9px; padding:8px 13px; font-size:12px; font-weight:600; cursor:pointer; }
+.filters .btn-clear { background:#fff; border:1px solid #dfe3e7; color:#59636f; }
+.filters .btn-export { background:#20242a; border:1px solid #20242a; color:#fff; }
+.filter-status { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:-3px 0 12px; color:#77818c; font-size:11px; }
+.filter-status strong { color:#333b44; font-weight:700; }
+.chips { gap:7px; }
+.chip { background:#fff; color:#5d6671; border-color:#dfe3e7; padding:6px 13px; }
+.chip.on { background:#fff9c9; color:#5e5500; border-color:#e2d33e; }
+.campaign-kpis .tile { min-height:104px; }
+.campaign-kpis .tile small { letter-spacing:.055em; }
+.campaign-kpis .tile b { font-size:25px; }
+.section-intro { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin:4px 0 10px; }
+.section-intro p { margin:4px 0 0; color:#77818c; font-size:12px; }
+.info-tip { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#eef1f4; color:#5e6874; font-size:10px; font-weight:700; cursor:help; vertical-align:middle; }
+.campaign-table th { white-space:nowrap; }
+.campaign-table th[data-sort] { cursor:pointer; user-select:none; transition:background .15s ease; }
+.campaign-table th[data-sort]:hover { background:#fff4a8; color:#252525; }
+.campaign-table th.sort-active { background:#fff4bf; color:#252525; font-weight:700; }
+.campaign-table th .sort-arrow { display:inline-block; margin-left:4px; color:#8a7600; font-size:12px; }
+.campaign-table td { white-space:nowrap; }
+.campaign-table td.campaign-name { white-space:normal; min-width:210px; max-width:300px; text-align:left; font-weight:600; }
+.campaign-table tr.total-row td { background:#fff9d8; font-weight:700; border-top:1px solid #e4d34c; }
+.campaign-table tr.segment-row td { background:#fff; color:#4f5964; font-size:12px; }
+.campaign-table tr.segment-row:hover td { background:#f7f9fb; }
+.campaign-table tr.segment-row.is-collapsed { display:none; }
+.campaign-rank { display:inline-grid; place-items:center; min-width:22px; height:22px; margin-right:6px; border-radius:7px; background:#f1f3f5; color:#53606d; font-size:12px; vertical-align:middle; }
+.campaign-table tr.rank-row td { background:#fffdf0; }
+.campaign-table tr.rank-1 td { background:#fff6cc; }
+.campaign-rank.rank-1 { background:#ffe58a; }
+.campaign-rank.rank-2 { background:#e9edf2; }
+.campaign-rank.rank-3 { background:#f5dfcf; }
+.row-toggle { display:inline-grid; place-items:center; width:22px; height:22px; margin-right:7px; border:1px solid #d9dfe5; border-radius:6px; background:#fff; color:#36404b; font-weight:700; cursor:pointer; }
+.row-toggle:hover { background:#fff7b5; border-color:#dfd04b; }
+.segment-tag { display:inline-block; padding:3px 7px; border-radius:6px; background:#f0f3f6; color:#59636f; font-size:10px; font-weight:700; letter-spacing:.03em; }
+.metric-legend { display:flex; flex-wrap:wrap; gap:12px; margin:0 0 10px; color:#707a85; font-size:11px; }
+.metric-legend span { display:inline-flex; align-items:center; gap:5px; }
+.metric-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.metric-dot.green { background:#16834a; } .metric-dot.orange { background:#d97706; } .metric-dot.blue { background:#2867b2; }
+.chart-card h3 { color:#3b444e; }
+.chart-explain { margin:-5px 0 8px; color:#7a838e; font-size:11px; }
+@media(max-width:760px){
+ .filters { position:static; gap:9px; }
+ .filters label, .filters label.search-filter { flex:1 1 calc(50% - 8px); min-width:0; }
+ .filters input, .filters select { min-width:0; width:100%; }
+ .filters .filter-actions { width:100%; margin:0; }
+ .filters .filter-actions button { flex:1; }
+ .filter-heading { align-items:flex-start; flex-direction:column; }
+ .campaign-table td.campaign-name { min-width:190px; }
+}
+
+</style>
+</head>
+<body>
+
+<div id="login-view">
+  <div class="login-card">
+    <div class="brand">
+      <div class="mark">TSC</div>
+      <div>
+        <h1>Datawarehouse</h1>
+      </div>
+    </div>
+    <p class="sub">Informe de resúmenes · acceso restringido</p>
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="username" placeholder="tu@empresa.com"/>
+    <label>Contraseña</label>
+    <input id="password" type="password" autocomplete="current-password"/>
+    <button class="primary" id="btn-login" type="button">Entrar</button>
+    <div class="err" id="login-err"></div>
+  </div>
+</div>
+
+<div id="app-view" class="hidden">
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">TSC</div>
+      <div>
+        <h1>Informe diario</h1>
+        <div id="subtitle">—</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn primary" id="btn-refresh">Actualizar</button>
+      <button type="button" class="btn ghost" id="btn-logout">Salir</button>
+    </div>
+  </header>
+  <nav class="nav" id="tabs">
+    <button type="button" class="on" data-p="conclusiones">Conclusiones</button>
+    <button type="button" data-p="cuadro">Cuadro</button>
+    <button type="button" data-p="suman">Suman</button>
+    <button type="button" data-p="restan">Restan</button>
+    <button type="button" data-p="objetivo">Objetivo PI</button>
+    <button type="button" data-p="altas">Altas</button>
+    <button type="button" data-p="cobranza">Cobranza</button>
+    <button type="button" data-p="campanas">Campañas</button>
+  </nav>
+  <main>
+    <div id="error-box" class="hidden"></div>
+    <div id="kpi-top"></div>
+    <div id="panel-conclusiones" class="panel on"></div>
+    <div id="panel-cuadro" class="panel"></div>
+    <div id="panel-suman" class="panel"></div>
+    <div id="panel-restan" class="panel"></div>
+    <div id="panel-objetivo" class="panel"></div>
+    <div id="panel-altas" class="panel"></div>
+    <div id="panel-cobranza" class="panel"></div>
+    <div id="panel-campanas" class="panel"></div>
+  </main>
+  <div class="ai-dock">
+    <button type="button" id="btn-ai" title="Próximamente">Ask AI</button>
+  </div>
+  <div id="ai-panel" class="ai-panel hidden">
+    <h4>Asistente (próximamente)</h4>
+    <p>Vas a poder preguntar en lenguaje natural sobre la base (altas, mora, campañas, cobranza) sin gastar el flujo manual de hoy. La data ya vive en Supabase; el modelo se conectará después.</p>
+  </div>
+</div>
+
+
+<script>
+const SUPABASE_URL = 'https://rbbkkyqgivsxajrtkoit.supabase.co'
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJiYmtreXFnaXZzeGFqcnRrb2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MjIwMzAsImV4cCI6MjEwNzQ5ODAzMH0.FA0RM8BxhbBCxPLFCuX2uIe7ZfoQuUwsL1GS7rKTiLc'
+const sb = supabase.createClient(SUPABASE_URL, KEY)
+const EMAIL_SUPABASE_URL = 'https://tqiuaywhgelhvrpeqghz.supabase.co'
+const EMAIL_KEY = 'sb_publishable_N02WnQDxVUi3FemT5EtESQ_GNcaDK75'
+const sbEmail = supabase.createClient(EMAIL_SUPABASE_URL, EMAIL_KEY)
+
+function fm(n){
+  if(n==null||n==='') return '—'
+  return Number(n).toLocaleString('es-AR')
+}
+function fmM(n){
+  if(n==null) return '—'
+  return '$'+(Number(n)/1e6).toLocaleString('es-AR',{maximumFractionDigits:1,minimumFractionDigits:1})+' M'
+}
+function pct(a,b){
+  if(!b) return '—'
+  return (100*Number(a)/Number(b)).toFixed(1).replace('.',',')+' %'
+}
+function fd(d){
+  if(!d) return '—'
+  const x=String(d).slice(0,10).split('-')
+  return x.length===3?x[2]+'/'+x[1]:d
+}
+function show(el,on){
+  el.classList.toggle('hidden', !on)
+}
+
+let D=null, P={}, charts={}
+let CAMP = []
+let CAMP_SEG = []
+let CAMP_EMAIL = []
+let CAMP_EMAIL_SEG = []
+let CAMP_FILTER_STATE = { q:'', canal:'', seg:'', desde:'', hasta:'', sort:'roi' }
+let CAMP_TABLE_SORT = { key:null, dir:'desc' }
+
+async function initAuth(){
+  const { data:{ session } } = await sb.auth.getSession()
+  if(session) enter()
+  else showLogin()
+
+  sb.auth.onAuthStateChange((_e,s)=> s?enter():showLogin())
+}
+
+function showLogin(){
+  show(document.getElementById('login-view'),true)
+  show(document.getElementById('app-view'),false)
+}
+
+function enter(){
+  show(document.getElementById('login-view'),false)
+  show(document.getElementById('app-view'),true)
+  load()
+}
+
+document.getElementById('btn-login').onclick = async ()=>{
+  const err=document.getElementById('login-err')
+  if(err){
+    err.textContent=''
+    show(err,false)
+  }
+
+  const { error } = await sb.auth.signInWithPassword({
+    email: document.getElementById('email').value.trim(),
+    password: document.getElementById('password').value
+  })
+
+  if(error){
+    if(err){
+      err.textContent=error.message
+      show(err,true)
+    } else {
+      alert(error.message)
+    }
+  }
+}
+
+document.getElementById('btn-logout').onclick = ()=> sb.auth.signOut()
+document.getElementById('btn-refresh').onclick = ()=> load()
+
+document.querySelectorAll('#tabs button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('on'))
+    b.classList.add('on')
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'))
+    document.getElementById('panel-'+b.dataset.p).classList.add('on')
+  }
+})
+
+async function load(){
+  const err=document.getElementById('error-box')
+  show(err,false)
+  document.getElementById('subtitle').textContent='Leyendo…'
+
+  const [k, c, s, e, es] = await Promise.all([
+    sb.from('informe_kpis').select('*').eq('id',1).maybeSingle(),
+    sb.from('informe_campanas').select('*').order('fecha_inicio', {ascending:true}),
+    sb.from('informe_campanas_seg').select('*').order('fecha_inicio', {ascending:true}),
+    sbEmail.from('informe_campanas_email').select('*'),
+    sbEmail.from('informe_campanas_email_seg').select('*')
+  ])
+
+  if(k.error){
+    err.textContent=k.error.message
+    show(err,true)
+    return
+  }
+
+  if(!k.data){
+    err.textContent='Sin datos. Ejecutá: python calcular_informe_kpis.py'
+    show(err,true)
+    return
+  }
+
+  D=k.data
+  P = typeof D.payload_json === 'string'
+    ? JSON.parse(D.payload_json)
+    : (D.payload_json||{})
+
+  CAMP = c.error ? [] : (c.data||[])
+  CAMP_SEG = s.error ? [] : (s.data||[])
+  CAMP_EMAIL = e.error ? [] : (e.data||[])
+  CAMP_EMAIL_SEG = es.error ? [] : (es.data||[])
+
+  if(c.error) console.warn('campanas', c.error.message)
+  if(s.error) console.warn('campanas_seg', s.error.message)
+  if(e.error) console.warn('campanas_email', e.error.message)
+  if(es.error) console.warn('campanas_email_seg', es.error.message)
+
+  render()
+}
+
+function render(){
+  const d=D
+  const gen = d.generado_en ? new Date(d.generado_en).toLocaleString('es-AR') : '—'
+
+  document.getElementById('subtitle').textContent =
+    `Generado ${gen} · compras ${fd(d.max_compra)} · préstamos ${fd(d.max_prestamo)} · débitos ${fd(d.max_debito)} · altas ${fd(d.max_alta)} · recibos ${fd(d.max_recibo)} · Período ${d.periodoventa} (desde ${fd(d.periodo_inicio)})`
+
+  document.getElementById('kpi-top').innerHTML = `
+    <div class="g4">
+      <div class="tile"><small>Base CARTERA + PI</small><b>${fm(d.base_cartera_pi)}</b><em>cuentas al inicio</em></div>
+      <div class="tile"><small>Suman (consumieron)</small><b class="ok">+${fm(d.suman)}</b><em>inactivos ${fm(d.suman_inactivos)} · altas ${fm(d.suman_altas)}</em></div>
+      <div class="tile"><small>Restan (máximo)</small><b class="ko">−${fm(d.restan_max)}</b><em>ver solapa Restan</em></div>
+      <div class="tile"><small>PI activos sin consumo</small><b>${fm(d.pi_sin_consumo)}</b><em>objetivo primordial</em></div>
+    </div>
+    <div class="g4">
+      <div class="tile"><small>Cobranza ${d.foto_cobranza||''} · a recuperar</small><b>${fmM(d.cob_a_recuperar)}</b><em>${fm(d.cob_cuentas_foto)} cuentas</em></div>
+      <div class="tile"><small>Recuperado</small><b class="ok">${fmM(d.cob_recuperado)}</b><em>${fm(d.cob_cuentas_pagaron)} pagaron</em></div>
+      <div class="tile"><small>% recupero</small><b>${d.cob_pct!=null?String(d.cob_pct).replace('.',',')+' %':'—'}</b></div>
+      <div class="tile"><small>Recibos fuera universo</small><b>${fmM(d.cob_recibos_fuera)}</b><em>altas ${fm(d.altas_periodo)}</em></div>
+    </div>`
+
+  const cell = (c) => {
+    if(c===''||c==null) return ''
+    const s=String(c)
+    const star=s.includes('*')
+    const n=s.replace('*','')
+    return fm(n)+(star?'*':'')
+  }
+
+  const rows = [
+    ['Inactivos', P.univ_inactivos, d.suman_inactivos, '', '', '', ''],
+    ['ASU (*)', P.univ_asu, (d.suman_asu!=null?d.suman_asu+'*':''), '', '', '', ''],
+    ['Altas del período (fuera de base)', P.univ_altas_fuera, d.suman_altas, '', '', '', ''],
+    ['Otras w_clientebase (*)', '', (d.suman_otras!=null?d.suman_otras+'*':''), '', '', '', ''],
+    ['Pasivo (mora 5)', '', '', '', '', d.restan_mora5, d.restan_mora5],
+    ['PI activos sin consumo (inicio ACTIVA)', '', '', d.restan_pi_inicio_sin_cons, d.restan_pi_inicio_sin_cons, d.restan_pi_inicio_sin_cons, d.restan_pi_inicio_sin_cons],
+    ['PI salió de mora, sin consumo', '', '', '', d.restan_pi_salio_mora, '', d.restan_pi_salio_mora],
+    ['Bajas (CARTERA + PI)', '', '', d.restan_bajas, d.restan_bajas, d.restan_bajas, d.restan_bajas],
+  ]
+
+  document.getElementById('panel-cuadro').innerHTML = `
+    <div class="card"><table>
+      <thead><tr><th>Segmento</th><th>Inicio período</th><th>Suma</th>
+        <th>Comercial PI inicio</th><th>Comercial + mora</th><th>PI + pasivo</th><th>PI + mora + pasivo</th></tr></thead>
+      <tbody>
+        ${rows.map(r=>'<tr>'+r.map((c,i)=>'<td>'+(i===0?c:cell(c))+'</td>').join('')+'</tr>').join('')}
+        <tr class="tot"><td>TOTAL</td><td></td><td>${fm(d.suman)}</td>
+          <td>${fm((d.restan_pi_inicio_sin_cons||0)+(d.restan_bajas||0))}</td>
+          <td>${fm((d.restan_pi_inicio_sin_cons||0)+(d.restan_pi_salio_mora||0)+(d.restan_bajas||0))}</td>
+          <td>${fm((d.restan_pi_inicio_sin_cons||0)+(d.restan_mora5||0)+(d.restan_bajas||0))}</td>
+          <td>${fm(d.restan_max)}</td></tr>
+        <tr class="res"><td>RESULTADO</td><td></td><td></td>
+          <td>${fm(d.esc1_resultado)}</td><td>${fm(d.esc2_resultado)}</td>
+          <td>${fm(d.esc3_resultado)}</td><td>${fm(d.esc4_resultado)}</td></tr>
+        <tr><td>Resúmenes estimados</td><td></td><td></td>
+          <td>${fm(d.esc1_resumenes)}</td><td>${fm(d.esc2_resumenes)}</td>
+          <td>${fm(d.esc3_resumenes)}</td><td>${fm(d.esc4_resumenes)}</td></tr>
+      </tbody></table>
+      <p class="note">(*) ASU y otras no entran en el total principal.</p>
+    </div>`
+
+  const id = P.inactivos_detalle || {}
+  const af = P.altas_fuera_base || {}
+
+  document.getElementById('panel-suman').innerHTML = `
+    <div class="card"><h3 style="margin-top:0">Suman: consumieron en el período</h3>
+      <table><thead><tr><th>Segmento</th><th>Universo</th><th>Consumieron</th><th>Compra</th><th>Préstamo</th><th>Débito</th></tr></thead>
+      <tbody>
+        <tr><td>Inactivos</td><td>${fm(P.univ_inactivos)}</td><td>${fm(d.suman_inactivos)}</td>
+          <td>${fm(id.con_compra)}</td><td>${fm(id.con_prestamo)}</td><td>${fm(id.con_debito)}</td></tr>
+        <tr><td>ASU (*)</td><td>${fm(P.univ_asu)}</td><td>${fm(d.suman_asu)}</td><td>${fm(d.suman_asu)}</td><td>0</td><td>0</td></tr>
+        <tr><td>Altas del período (fuera de base)</td><td>${fm(P.univ_altas_fuera)}</td><td>${fm(d.suman_altas)}</td>
+          <td>${fm(af.con_compra||d.suman_altas)}</td><td>${fm(af.con_prestamo||0)}</td><td>0</td></tr>
+        <tr><td>Otras (*)</td><td></td><td>${fm(d.suman_otras)}</td><td>${fm(d.suman_otras)}</td><td>0</td><td>0</td></tr>
+        <tr class="tot"><td>Total suman</td><td></td><td>${fm(d.suman)}</td><td colspan="3"></td></tr>
+      </tbody></table>
+      <p class="note">Altas período ${d.periodoventa}: ${fm(d.altas_periodo)}.</p>
+    </div>`
+
+  document.getElementById('panel-restan').innerHTML = `
+    <div class="card"><table>
+      <thead><tr><th>Concepto</th><th>Cuentas</th></tr></thead>
+      <tbody>
+        <tr><td>PI activos sin consumo (iniciaron ACTIVA)</td><td>${fm(d.restan_pi_inicio_sin_cons)}</td></tr>
+        <tr><td>PI que salieron de mora a ACTIVA, sin consumo</td><td>${fm(d.restan_pi_salio_mora)}</td></tr>
+        <tr><td>Pasivo: mora 5 hoy</td><td>${fm(d.restan_mora5)}</td></tr>
+        <tr><td>Bajas (CARTERA + PI)</td><td>${fm(d.restan_bajas)}</td></tr>
+        <tr class="res"><td>Total máximo</td><td>${fm(d.restan_max)}</td></tr>
+      </tbody></table></div>`
+
+  const buckets = P.psc_buckets || []
+  const order = ['1-2','3-4','5-6','7+','vacio']
+  const labels = {'1-2':'1 a 2','3-4':'3 a 4','5-6':'5 a 6','7+':'7 o más','vacio':'Sin dato'}
+  const bmap = Object.fromEntries(buckets.map(b=>[b.bucket, Number(b.cuentas)]))
+  const totPI = d.pi_sin_consumo || order.reduce((s,k)=>s+(bmap[k]||0),0)
+
+  document.getElementById('panel-objetivo').innerHTML = `
+    <div class="card"><h3 style="margin-top:0">Objetivo: PI activos sin consumo = ${fm(totPI)}</h3>
+      <table><thead><tr><th>Períodos sin compra</th><th>Cuentas</th><th>%</th></tr></thead>
+      <tbody>${order.map(k=>{ const n=bmap[k]||0; return `<tr><td>${labels[k]}</td><td>${fm(n)}</td><td>${pct(n,totPI)}</td></tr>` }).join('')}
+        <tr class="tot"><td>Total</td><td>${fm(totPI)}</td><td>100 %</td></tr>
+      </tbody></table>
+      <p class="note">Re-ejecutá calcular_informe_kpis.py si esta tabla está vacía (versión nueva del script).</p>
+    </div>`
+
+  const hist = P.altas_hist || []
+
+  document.getElementById('panel-altas').innerHTML = `
+    <div class="card">
+      <h3 style="margin-top:0">Altas por período de venta</h3>
+      <div class="chart-wrap"><canvas id="chartAltas"></canvas></div>
+      <table>
+        <thead><tr><th>Período venta</th><th>Altas</th><th>Con uso</th><th>% uso</th></tr></thead>
+        <tbody>${hist.map(r=>{
+          const a=Number(r.cuentas), u=Number(r.con_uso)
+          return `<tr><td>${r.periodoventa}${r.periodoventa===d.periodoventa?' (en curso)':''}</td>
+            <td>${fm(a)}</td><td>${fm(u)}</td><td>${pct(u,a)}</td></tr>`
+        }).join('')||'<tr><td colspan="4">Re-ejecutá calcular_informe_kpis.py</td></tr>'}
+        </tbody></table>
+    </div>`
+
+  if (charts.altas) charts.altas.destroy()
+
+  if (hist.length && window.Chart) {
+    const labels = hist.map(r => r.periodoventa)
+    const actuales = hist.map(r => Number(r.cuentas))
+    const uso = hist.map(r => Number(r.con_uso))
+
+    charts.altas = new Chart(document.getElementById('chartAltas'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Altas', data: actuales, borderColor: '#1d1d1b', backgroundColor: 'transparent', tension: 0.2, borderWidth: 2 },
+          { label: 'Con uso', data: uso, borderColor: '#c62828', backgroundColor: 'transparent', tension: 0.2, borderWidth: 2 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' } },
+        scales: { y: { beginAtZero: true } }
+      }
+    })
+  }
+
+  const dims = P.cob_dim || []
+  const mora = dims.filter(x=>x.dim==='mora')
+  const estado = dims.filter(x=>x.dim==='estado')
+  const suc = dims.filter(x=>x.dim==='sucursal').sort((a,b)=>Number(b.a_rec)-Number(a.a_rec))
+  const dias = P.cob_dias || []
+
+  function cobTable(title, rows){
+    if(!rows.length) return `<p class="note">${title}: re-ejecutá el script para llenar detalle</p>`
+    return `<h3>${title}</h3><table>
+      <thead><tr><th></th><th>Cuentas</th><th>A recuperar</th><th>Recuperado</th><th>% recupero</th><th>Pagaron</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td>${r.k||'—'}</td><td>${fm(r.cuentas)}</td><td>${fmM(r.a_rec)}</td><td>${fmM(r.rec)}</td>
+        <td>${pct(r.rec,r.a_rec)}</td><td>${fm(r.pagaron)}</td></tr>`).join('')}
+      </tbody></table>`
+  }
+
+  document.getElementById('panel-cobranza').innerHTML = `
+    <div class="card">
+      <div class="g4" style="margin-bottom:12px">
+        <div class="tile"><small>A recuperar</small><b>${fmM(d.cob_a_recuperar)}</b></div>
+        <div class="tile"><small>Recuperado</small><b class="ok">${fmM(d.cob_recuperado)}</b></div>
+        <div class="tile"><small>% recupero</small><b>${d.cob_pct!=null?String(d.cob_pct).replace('.',',')+' %':'—'}</b></div>
+        <div class="tile"><small>Fuera universo</small><b>${fmM(d.cob_recibos_fuera)}</b></div>
+      </div>
+      ${cobTable('Por mora al inicio', mora)}
+      ${cobTable('Por estado al inicio', estado)}
+      ${cobTable('Por sucursal', suc)}
+      ${dias.length?`
+        <h3>Recuperado acumulado (% sobre a recuperar)</h3>
+        <div class="chart-wrap"><canvas id="chartCob"></canvas></div>
+        <h3>Recuperado por día</h3>
+        <table>
+          <thead><tr><th>Día</th><th>Monto</th></tr></thead>
+          <tbody>${dias.map(r=>`<tr><td>${fd(r.dia)}</td><td>${fmM(r.monto)}</td></tr>`).join('')}</tbody>
+        </table>`:''}
+    </div>`
+
+  if (charts.cob) charts.cob.destroy()
+
+  if (dias.length && window.Chart && d.cob_a_recuperar) {
+    let acc = 0
+    const target = Number(d.cob_a_recuperar) || 1
+    const labels = []
+    const pcts = []
+
+    dias.forEach(r => {
+      acc += Number(r.monto) || 0
+      labels.push(fd(r.dia))
+      pcts.push(Math.round(1000 * acc / target) / 10)
+    })
+
+    charts.cob = new Chart(document.getElementById('chartCob'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: '% recupero acumulado',
+          data: pcts,
+          borderColor: '#c62828',
+          backgroundColor: 'rgba(198,40,40,0.08)',
+          fill: true,
+          tension: 0.25,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' } },
+        scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+      }
+    })
+  }
+
+  // --- Campañas y conclusiones ---
+  renderCampanas()
+  renderConclusiones(d, P)
+}
+
+function renderConclusiones(d, p){
+  const host = document.getElementById('panel-conclusiones')
+  if (!host) return
+  const n = v => Number(v || 0)
+  const money = v => '$' + n(v).toLocaleString('es-AR',{maximumFractionDigits:0})
+  const pctValue = (a,b) => b ? (100*a/b) : null
+  const fmtPct = v => v == null ? '—' : v.toFixed(1).replace('.',',') + ' %'
+  const fmtNum = v => n(v).toLocaleString('es-AR',{maximumFractionDigits:0})
+
+  const suman = n(d.suman)
+  const restan = n(d.restan_max)
+  const neto = suman - restan
+  const rec = n(d.cob_recuperado)
+  const aRec = n(d.cob_a_recuperar)
+  const recPct = aRec ? 100*rec/aRec : null
+  const altas = n(d.altas_periodo)
+  const altasUso = n(d.suman_altas)
+  const altasPct = pctValue(altasUso, altas)
+  const pi = n(d.pi_sin_consumo)
+  const buckets = p.psc_buckets || []
+  const bucketMap = Object.fromEntries(buckets.map(x => [String(x.bucket),n(x.cuentas)]))
+  const pi12 = bucketMap['1-2'] || 0
+  const pi34 = bucketMap['3-4'] || 0
+  const pi56 = bucketMap['5-6'] || 0
+  const pi7 = bucketMap['7+'] || 0
+  const piSinDato = bucketMap['vacio'] || 0
+  const piConAntiguedad = pi12+pi34+pi56+pi7
+  const piLarga = pi56+pi7
+
+  const escenarios = [
+    {name:'Comercial PI inicio', value:n(d.esc1_resultado)},
+    {name:'Comercial + mora', value:n(d.esc2_resultado)},
+    {name:'PI + pasivo', value:n(d.esc3_resultado)},
+    {name:'PI + mora + pasivo', value:n(d.esc4_resultado)}
+  ]
+  const mejor = escenarios.reduce((a,b)=>b.value>a.value?b:a, escenarios[0])
+  const peor = escenarios.reduce((a,b)=>b.value<a.value?b:a, escenarios[0])
+
+  // Las campañas se agrupan desde la tabla segmentada para no duplicar totales.
+  const campRows = (CAMP_SEG && CAMP_SEG.length ? CAMP_SEG : CAMP || [])
+  const byCampaign = new Map()
+  campRows.forEach(r=>{
+    const key = [String(r.fecha_inicio||'').slice(0,10),String(r.campana||'').trim().toUpperCase(),String(r.canal||'').trim().toUpperCase()].join('||')
+    if (!byCampaign.has(key)) byCampaign.set(key,{name:r.campana||'Campaña sin nombre', canal:r.canal||'—', contactados:0, consumieron:0, facturacion:0, costo:0})
+    const x=byCampaign.get(key)
+    x.contactados+=n(r.contactados); x.consumieron+=n(r.consumieron); x.facturacion+=n(r.facturacion); x.costo+=n(r.costo_envio)
+  })
+  const campaignTotals=[...byCampaign.values()].filter(x=>x.contactados>0)
+  const campaignBest=[...campaignTotals].sort((a,b)=>(b.contactados?b.consumieron/b.contactados:0)-(a.contactados?a.consumieron/a.contactados:0))[0]
+  const campaignROI=[...campaignTotals].filter(x=>x.costo>0).sort((a,b)=>b.facturacion/b.costo-a.facturacion/a.costo)[0]
+
+  const balanceTone = neto>=0?'good':'warn'
+  const balanceText = neto>=0
+    ? `En el período, las cuentas que se sumaron superan a las que restaron por <strong>${fmtNum(neto)}</strong>. La lectura cambia según el escenario de bajas y mora que se tome como referencia.`
+    : `En el período, las cuentas que restaron superan a las que se sumaron por <strong>${fmtNum(Math.abs(neto))}</strong>. Conviene revisar los componentes de Restan y el escenario aplicado.`
+
+  const piText = piConAntiguedad
+    ? `De las cuentas PI activas sin consumo, <strong>${fmtNum(piLarga)}</strong> acumulan 5 o más períodos sin comprar (${fmtPct(pctValue(piLarga,piConAntiguedad))} de las que tienen antigüedad informada). Este grupo puede requerir una estrategia de reactivación distinta.`
+    : `No hay distribución de antigüedad suficiente para analizar los períodos sin compra. Verificá que el cálculo haya cargado psc_buckets.`
+
+  const campaignText = campaignBest
+    ? `La mayor tasa de conversión entre las campañas cargadas corresponde a <strong>${campaignBest.name}</strong> (${fmtPct(pctValue(campaignBest.consumieron,campaignBest.contactados))}). Compará también el volumen alcanzado antes de definirla como ganadora.`
+    : `No hay campañas con destinatarios suficientes para calcular una tasa de conversión en este período.`
+
+  const roiText = campaignROI
+    ? `Entre las campañas con costo informado, <strong>${campaignROI.name}</strong> registra el mayor retorno bruto: <strong>${(campaignROI.facturacion/campaignROI.costo).toFixed(2).replace('.',',')} por cada $1 invertido</strong>. Es una relación de facturación sobre costo, no una rentabilidad neta.`
+    : `No hay campañas con costo y facturación informados para calcular retorno sobre inversión.`
+
+  const highlights = []
+  if (recPct != null) highlights.push(`Cobranza recuperó <strong>${money(rec)}</strong> de ${money(aRec)} a recuperar (${fmtPct(recPct)}).`)
+  if (altasPct != null) highlights.push(`Del total de ${fmtNum(altas)} altas del período, ${fmtNum(altasUso)} registraron uso (${fmtPct(altasPct)}).`)
+  if (pi>0) highlights.push(`Quedan <strong>${fmtNum(pi)}</strong> cuentas PI activas sin consumo para trabajar.`)
+  if (campaignBest) highlights.push(`La campaña con mejor conversión fue <strong>${campaignBest.name}</strong>.`)
+  if (!highlights.length) highlights.push('Todavía no hay suficientes indicadores cargados para elaborar conclusiones automáticas.')
+
+  host.innerHTML = `
+    <div class="insight-callout">
+      <h3>Lectura ejecutiva del período · ${d.periodoventa || 'período actual'}</h3>
+      <p>${balanceText}</p>
+      <ul class="insight-list">${highlights.map(x=>`<li>${x}</li>`).join('')}</ul>
+    </div>
+    <div class="insight-grid">
+      <article class="insight-card ${balanceTone}">
+        <h3>Balance de cuentas</h3><span class="insight-value">${neto>=0?'+':'−'}${fmtNum(Math.abs(neto))}</span>
+        <p>${balanceText}</p><p class="note">Suman: ${fmtNum(suman)} · Restan máximo: ${fmtNum(restan)}</p>
+      </article>
+      <article class="insight-card ${recPct!=null && recPct>=50?'good':'warn'}">
+        <h3>Desempeño de cobranza</h3><span class="insight-value">${fmtPct(recPct)}</span>
+        <p>Se recuperaron <strong>${money(rec)}</strong> sobre <strong>${money(aRec)}</strong> a recuperar${d.cob_cuentas_pagaron!=null?`, con ${fmtNum(d.cob_cuentas_pagaron)} cuentas que pagaron`:''}.</p>
+      </article>
+      <article class="insight-card ${altasPct!=null && altasPct>=50?'good':'info'}">
+        <h3>Activación de altas</h3><span class="insight-value">${fmtPct(altasPct)}</span>
+        <p>${fmtNum(altasUso)} de ${fmtNum(altas)} altas registraron uso en el período. Este indicador permite observar la activación inicial de la nueva cartera.</p>
+      </article>
+      <article class="insight-card ${piLarga>0?'warn':'info'}">
+        <h3>Antigüedad del PI sin consumo</h3><span class="insight-value">${fmtNum(piLarga)}</span>
+        <p>${piText}</p><p class="note">Universo PI sin consumo: ${fmtNum(pi)} · Sin dato de antigüedad: ${fmtNum(piSinDato)}</p>
+      </article>
+      <article class="insight-card info">
+        <h3>Campaña con mayor conversión</h3><p>${campaignText}</p>
+      </article>
+      <article class="insight-card info">
+        <h3>Mejor retorno de campaña</h3><p>${roiText}</p>
+      </article>
+    </div>
+    <div class="card">
+      <h3>Escenarios de resultado</h3>
+      <p class="note">No son pronósticos: son los resultados calculados para los cuatro criterios de bajas y mora del cuadro principal.</p>
+      <div class="tbl-wrap"><table><thead><tr><th>Escenario</th><th>Resultado</th><th>Lectura</th></tr></thead><tbody>
+        ${escenarios.map(x=>`<tr><td>${x.name}</td><td>${fmtNum(x.value)}</td><td>${x.name===mejor.name?'Mayor resultado':x.name===peor.name?'Menor resultado':'Escenario intermedio'}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>
+    <p class="note">Conclusiones calculadas automáticamente con los datos disponibles del informe. No se compara contra períodos anteriores porque la fuente actual no aporta una serie histórica homogénea para todos estos indicadores.</p>`
+}
+
+function segmentoCamp(nombre){
+  const u = (nombre||'').toUpperCase()
+  const segs = []
+  if (u.includes('INAC')) segs.push('INAC')
+  if (/\bPI\b/.test(u) || u.includes('- PI')) segs.push('PI')
+  if (u.includes('CARTERA') || u.includes('CART')) segs.push('CARTERA')
+  if (u.includes('ASU') || u.includes('ALTA SIN USO')) segs.push('ASU')
+  return segs.length ? segs.join('+') : 'OTRO'
+}
+
+function renderCampanas(){
+  const oldQ = document.getElementById('cf-q')
+  if (oldQ) CAMP_FILTER_STATE = {
+    q: oldQ.value || '',
+    canal: document.getElementById('cf-canal')?.value || '',
+    seg: document.getElementById('cf-seg')?.value || '',
+    desde: document.getElementById('cf-desde')?.value || '',
+    hasta: document.getElementById('cf-hasta')?.value || '',
+    sort: document.getElementById('cf-sort')?.value || CAMP_FILTER_STATE.sort || 'roi'
+  }
+  const segRows = (CAMP_SEG||[])
+  const baseRows = segRows.length ? segRows : (CAMP||[])
+
+  // Totales generales: una sola fuente por campaña.
+  const emailMap = new Map(
+    (CAMP_EMAIL||[]).map(e => [
+      (e.campana||'').trim().toUpperCase(), e
+    ])
+  )
+
+  // Métricas segmentadas: cruce por campaña + segmento.
+  const normEmailKey = v => String(v||'').trim().toUpperCase()
+  const emailSegMap = new Map(
+    (CAMP_EMAIL_SEG||[]).map(e => [
+      normEmailKey(e.campana) + '||' + normEmailKey(e.segmento), e
+    ])
+  )
+
+  const all = baseRows.map(r => {
+    const fi = r.fecha_inicio ? String(r.fecha_inicio).slice(0,10) : ''
+    const campKey = normEmailKey(r.campana)
+    const segment = (r.segmento || segmentoCamp(r.campana) || 'SIN_DATO').toString().trim().toUpperCase()
+    const emailSeg = emailSegMap.get(campKey + '||' + normEmailKey(segment)) || {}
+
+    return {
+      ...r,
+      _seg: segment,
+      _fi: fi,
+      _fiDate: fi ? new Date(fi + 'T12:00:00') : null,
+      aperturas_totales: emailSeg.aperturas_totales,
+      aperturas_unicas: emailSeg.aperturas_unicas,
+      pct_apertura: emailSeg.pct_apertura,
+      clics_totales: emailSeg.clics_totales,
+      clics_unicos: emailSeg.clics_unicos,
+      pct_clics: emailSeg.pct_clics
+    }
+  })
+
+  const canales = [...new Set(all.map(r => r.canal || '—'))].sort()
+  const segs = [...new Set(all.map(r => r._seg))].sort()
+
+  const el = document.getElementById('panel-campanas')
+
+  el.innerHTML = `
+    <div class="filters" aria-label="Filtros de campañas">
+      <div class="filter-heading">
+        <strong>Explorar campañas</strong>
+        <span>Los indicadores y gráficos se actualizan al cambiar un filtro</span>
+      </div>
+      <label class="search-filter">Buscar campaña
+        <input type="search" id="cf-q" placeholder="Nombre, acción o referencia…" autocomplete="off" />
+      </label>
+      <label>Canal
+        <select id="cf-canal"><option value="">Todos los canales</option>${canales.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+      </label>
+      <label>Segmento
+        <select id="cf-seg"><option value="">Todos los segmentos</option>${segs.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+      </label>
+      <label>Desde<input type="date" id="cf-desde" aria-label="Fecha desde" /></label>
+      <label>Hasta<input type="date" id="cf-hasta" aria-label="Fecha hasta" /></label>
+      <label>Ordenar campañas
+        <select id="cf-sort" title="Ordena las campañas según el indicador elegido">
+          <option value="roi">Mayor ROI</option>
+          <option value="facturacion">Mayor facturación</option>
+          <option value="consumieron">Más consumos</option>
+          <option value="conversion">Mejor conversión</option>
+          <option value="costo_conv">Menor costo por conversión</option>
+          <option value="contactados">Mayor alcance</option>
+          <option value="recent">Más recientes</option>
+        </select>
+      </label>
+      <div class="filter-actions">
+        <button type="button" class="btn-filter btn-clear" id="cf-reset">Limpiar filtros</button>
+        <button type="button" class="btn-filter btn-export" id="cf-xls">↓ Exportar Excel</button>
+      </div>
+    </div>
+    <div class="filter-status"><span id="cf-filter-summary">Todos los registros</span><span>Vista dinámica · sin recargar la página</span></div>
+    <div class="chips" id="cf-seg-chips"></div>
+    <div class="metric-legend">
+      <span><i class="metric-dot green"></i> Resultados positivos: consumo y facturación</span>
+      <span><i class="metric-dot orange"></i> Inversión y costos</span>
+      <span><i class="metric-dot blue"></i> Alcance e interacción</span>
+    </div>
+    <div class="g4 campaign-kpis" id="cf-kpis"></div>
+    <div class="g4" style="grid-template-columns:1.15fr 0.85fr">
+      <div class="card" style="padding:10px">
+        <h3 style="margin:0 0 8px;font-size:14px">Resumen por canal <span class="info-tip" title="Compara alcance, conversiones, costo y facturación agrupados por canal.">i</span></h3>
+        <div class="tbl-wrap" style="max-height:240px"><table>
+          <thead><tr>
+            <th>Canal</th><th>Envíos</th><th>Consumieron</th><th>Costo</th>
+            <th>Facturación</th><th>Costo/conv</th><th>% conv</th><th>$/$ inv.</th>
+          </tr></thead>
+          <tbody id="cf-by-canal"></tbody>
+        </table></div>
+      </div>
+      <div class="card" style="padding:10px">
+        <h3 style="margin:0 0 8px;font-size:14px">Participación de envíos <span class="info-tip" title="Distribución porcentual de los destinatarios entre los canales visibles.">i</span></h3>
+        <p class="chart-explain">Porcentaje de envíos que aporta cada canal.</p><div class="chart-wrap"><canvas id="chartCampPie"></canvas></div>
+      </div>
+    </div>
+    <div class="g4" style="grid-template-columns:1fr 1fr">
+      <div class="card" style="padding:10px">
+        <h3 style="margin:0 0 8px;font-size:14px">Resultado por segmento <span class="info-tip" title="Agrupa las métricas comerciales por segmento ESPI de la base.">i</span></h3>
+        <div class="tbl-wrap" style="max-height:220px"><table>
+          <thead><tr><th>Segmento</th><th>Envíos</th><th>Consumieron</th><th>Facturación</th><th>% conv</th></tr></thead>
+          <tbody id="cf-by-seg"></tbody>
+        </table></div>
+      </div>
+      <div class="card" style="padding:10px">
+        <h3 style="margin:0 0 8px;font-size:14px">Conversión por canal <span class="info-tip" title="Consumieron dividido por envíos, expresado como porcentaje.">i</span></h3>
+        <p class="chart-explain">Tasa de conversión: cuentas que consumieron sobre destinatarios.</p><div class="chart-wrap"><canvas id="chartCampCanal"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="padding:10px">
+      <h3 style="margin:0 0 6px;font-size:14px">Evolución semanal <span class="info-tip" title="Compara envíos, consumos y tasa de conversión por semana del ciclo comercial.">i</span></h3>
+      <p class="note" style="margin-top:0">Cada bloque empieza el día 24. Semana 1 = 24–30, Semana 2 = 31–6, etc.</p>
+      <p class="chart-explain">Las barras muestran volumen; la línea muestra el porcentaje de conversión. Pasá el cursor para ver el detalle.</p><div class="chart-wrap" style="height:260px"><canvas id="chartCampSem"></canvas></div>
+      <div class="tbl-wrap" style="max-height:200px"><table>
+        <thead><tr>
+          <th>Ciclo</th><th>Semana</th><th>Rango</th><th>Envíos</th><th>Consumieron</th>
+          <th>% conv</th><th>Facturación</th><th>Costo</th><th>$/$ inv.</th>
+        </tr></thead>
+        <tbody id="cf-by-sem"></tbody>
+      </table></div>
+    </div>
+    <div class="card" style="padding:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <h3 style="margin:0;font-size:14px">Detalle de campañas <span class="info-tip" title="La fila TOTAL reúne los resultados comerciales y el email general. Expandí cada campaña para consultar el detalle de CARTERA y PI.">i</span></h3>
+        <span class="note" id="cf-note"></span>
+      </div>
+      <div class="tbl-wrap"><table class="campaign-table">
+        <thead><tr>
+          <th data-sort="fecha" title="Ordenar por fecha">Fecha</th><th data-sort="campana">Campaña</th><th data-sort="segmento">Seg.</th><th data-sort="canal">Canal</th>
+          <th data-sort="contactados">Envíos</th><th data-sort="consumieron">Consumieron</th><th data-sort="costo">Costo</th>
+          <th data-sort="facturacion">Facturación</th><th data-sort="costo_conv">Costo/conv</th><th data-sort="conversion">% conv</th><th data-sort="roi">$/$ inv.</th>
+          <th data-sort="aperturas">Aperturas</th><th data-sort="aperturas_unicas">Aperturas únicas</th><th data-sort="pct_apertura">% apertura</th>
+          <th data-sort="clics">Clics</th><th data-sort="clics_unicos">Clics únicos</th><th data-sort="pct_clics">% clics</th>
+        </tr></thead>
+        <tbody id="cf-tbody"></tbody>
+      </table></div>
+    </div>`
+
+  const q = document.getElementById('cf-q')
+  const selCanal = document.getElementById('cf-canal')
+  const selSeg = document.getElementById('cf-seg')
+  const desde = document.getElementById('cf-desde')
+  const hasta = document.getElementById('cf-hasta')
+  const sortSelect = document.getElementById('cf-sort')
+
+  q.value = CAMP_FILTER_STATE.q || ''
+  selCanal.value = CAMP_FILTER_STATE.canal || ''
+  selSeg.value = CAMP_FILTER_STATE.seg || ''
+  desde.value = CAMP_FILTER_STATE.desde || ''
+  hasta.value = CAMP_FILTER_STATE.hasta || ''
+  sortSelect.value = CAMP_FILTER_STATE.sort || 'roi'
+
+  // Prefill date bounds from data
+  const fechas = all.map(r => r._fi).filter(Boolean).sort()
+  if (fechas.length) {
+    desde.min = fechas[0]
+    hasta.min = fechas[0]
+    desde.max = fechas[fechas.length-1]
+    hasta.max = fechas[fechas.length-1]
+  }
+
+  const chipHost = document.getElementById('cf-seg-chips')
+  chipHost.innerHTML = segs.map(s =>
+    `<button type="button" class="chip" data-seg="${s}">${s}</button>`
+  ).join('') + `<button type="button" class="chip on" data-seg="">Todos</button>`
+
+  function money(n){
+    return '$' + Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0})
+  }
+
+  function pctEmail(n){
+    if(n==null || n==='') return '—'
+    return Number(n).toFixed(1).replace('.',',')+' %'
+  }
+
+  /** Ciclo tarjeta: el período empieza el día 24.
+      Devuelve { ciclo:'2026-10', semana:1, label:'S1 24–30/10', key:'2026-10-S1' } */
+  function semanaCiclo(fi){
+    if (!fi) return null
+    const d = new Date(fi + 'T12:00:00')
+    if (isNaN(d)) return null
+
+    const y = d.getFullYear(), m = d.getMonth(), day = d.getDate()
+    let cy = y, cm = m
+
+    if (day < 24) {
+      cm = m - 1
+      if (cm < 0) { cm = 11; cy = y - 1 }
+    }
+
+    const start = new Date(cy, cm, 24, 12, 0, 0)
+    const diffDays = Math.floor((d - start) / 86400000)
+    const semana = Math.floor(diffDays / 7) + 1
+    const s0 = new Date(start.getTime() + (semana-1)*7*86400000)
+    const s1 = new Date(s0.getTime() + 6*86400000)
+    const fmt = x => x.getDate() + '/' + (x.getMonth()+1)
+    const ciclo = cy + '-' + String(cm+1).padStart(2,'0')
+
+    return {
+      ciclo,
+      semana,
+      key: ciclo + '-S' + semana,
+      label: 'S' + semana + ' ' + fmt(s0) + '–' + fmt(s1),
+      sort: cy*10000 + (cm+1)*100 + semana
+    }
+  }
+
+  function filtrar(){
+    const text = (q.value||'').trim().toLowerCase()
+    const canal = selCanal.value
+    const seg = selSeg.value
+    const d0 = (desde.value||'').trim()
+    const d1 = (hasta.value||'').trim()
+
+    return all.filter(r => {
+      if (text && !(r.campana||'').toLowerCase().includes(text)) return false
+      if (canal && (r.canal||'—') !== canal) return false
+      if (seg && r._seg !== seg) return false
+      if (d0 && r._fi && r._fi < d0) return false
+      if (d1 && r._fi && r._fi > d1) return false
+      return true
+    })
+  }
+
+  function agg(rows, keyFn){
+    const m = {}
+
+    rows.forEach(r => {
+      const k = keyFn(r)
+      if (!m[k]) m[k] = {c:0,s:0,f:0,k:0, meta:null}
+      m[k].c += Number(r.contactados)||0
+      m[k].s += Number(r.consumieron)||0
+      m[k].f += Number(r.facturacion)||0
+      m[k].k += Number(r.costo_envio)||0
+    })
+
+    return m
+  }
+
+  function pintar(){
+    const rows = filtrar().sort((a,b)=>
+      (a._fi||'').localeCompare(b._fi||'') ||
+      (a.campana||'').localeCompare(b.campana||'') ||
+      (a._seg||'').localeCompare(b._seg||'')
+    )
+
+    const totC = rows.reduce((s,r)=>s+(Number(r.contactados)||0),0)
+    const totS = rows.reduce((s,r)=>s+(Number(r.consumieron)||0),0)
+    const totF = rows.reduce((s,r)=>s+(Number(r.facturacion)||0),0)
+    const totK = rows.reduce((s,r)=>s+(Number(r.costo_envio)||0),0)
+    const cpc = totS ? totK/totS : null
+    const roi = totK ? totF/totK : null
+
+    document.getElementById('cf-kpis').innerHTML = `
+      <div class="tile activity" title="Cantidad total de destinatarios/contactos incluidos en las campañas filtradas."><small>Envíos <span class="info-tip" title="Destinatarios alcanzados por las campañas del filtro.">i</span></small><b class="activity">${fm(totC)}</b><em>${fm(rows.length)} registros de segmento</em></div>
+      <div class="tile good" title="Cantidad de destinatarios que registraron consumo."><small>Consumieron <span class="info-tip" title="Cuentas que consumieron; debajo se muestra la tasa sobre envíos.">i</span></small><b class="good">${fm(totS)}</b><em>${pct(totS,totC)} de los envíos</em></div>
+      <div class="tile cost" title="Inversión total asociada a los envíos."><small>Costo de envío <span class="info-tip" title="Costo total y costo promedio por cada cuenta que consumió.">i</span></small><b class="cost">${money(totK)}</b><em>costo por conversión ${cpc!=null?money(cpc):'—'}</em></div>
+      <div class="tile good" title="Facturación atribuida a las campañas seleccionadas."><small>Facturación <span class="info-tip" title="Facturación generada y retorno bruto por cada peso invertido.">i</span></small><b class="good">${fmM(totF)}</b><em>Retorno por $ invertido: ${roi!=null?roi.toFixed(2).replace('.',','):'—'}</em></div>`
+
+    const byC = agg(rows, r => r.canal || '—')
+    const canalKeys = Object.keys(byC).sort()
+
+    let htmlC = canalKeys.map(k => {
+      const x = byC[k]
+      const conv = x.c ? (100*x.s/x.c) : 0
+      const cpc2 = x.s ? x.k/x.s : null
+      const inv = x.k ? x.f/x.k : null
+
+      return `<tr>
+        <td>${k}</td><td>${fm(x.c)}</td><td>${fm(x.s)}</td><td>${money(x.k)}</td>
+        <td>${fmM(x.f)}</td><td>${cpc2!=null?money(cpc2):'—'}</td>
+        <td>${conv.toFixed(2).replace('.',',')} %</td><td>${inv!=null?inv.toFixed(2):'—'}</td></tr>`
+    }).join('')
+
+    htmlC += `<tr class="tot"><td>Total</td><td>${fm(totC)}</td><td>${fm(totS)}</td><td>${money(totK)}</td>
+      <td>${fmM(totF)}</td><td>${cpc!=null?money(cpc):'—'}</td><td>${pct(totS,totC)}</td><td>${roi!=null?roi.toFixed(2):'—'}</td></tr>`
+
+    document.getElementById('cf-by-canal').innerHTML = htmlC || '<tr><td colspan="8">Sin datos</td></tr>'
+
+    const byS = agg(rows, r => r._seg)
+
+    document.getElementById('cf-by-seg').innerHTML = Object.keys(byS).sort().map(k => {
+      const x = byS[k]
+      return `<tr><td>${k}</td><td>${fm(x.c)}</td><td>${fm(x.s)}</td><td>${fmM(x.f)}</td><td>${pct(x.s,x.c)}</td></tr>`
+    }).join('') || '<tr><td colspan="5">Sin datos</td></tr>'
+
+    // semanas
+    const bySem = {}
+
+    rows.forEach(r => {
+      const w = semanaCiclo(r._fi)
+      if (!w) return
+      if (!bySem[w.key]) bySem[w.key] = {c:0,s:0,f:0,k:0, meta:w}
+
+      bySem[w.key].c += Number(r.contactados)||0
+      bySem[w.key].s += Number(r.consumieron)||0
+      bySem[w.key].f += Number(r.facturacion)||0
+      bySem[w.key].k += Number(r.costo_envio)||0
+    })
+
+    const semKeys = Object.keys(bySem).sort((a,b)=> bySem[a].meta.sort - bySem[b].meta.sort)
+
+    document.getElementById('cf-by-sem').innerHTML = semKeys.map(k => {
+      const x = bySem[k], w = x.meta
+      const conv = x.c ? (100*x.s/x.c) : 0
+      const inv = x.k ? x.f/x.k : null
+
+      return `<tr>
+        <td>${w.ciclo}</td><td>S${w.semana}</td><td>${w.label}</td>
+        <td>${fm(x.c)}</td><td>${fm(x.s)}</td>
+        <td>${conv.toFixed(1).replace('.',',')} %</td>
+        <td>${fmM(x.f)}</td><td>${money(x.k)}</td>
+        <td>${inv!=null?inv.toFixed(2):'—'}</td></tr>`
+    }).join('') || '<tr><td colspan="9">Sin fechas de campaña</td></tr>'
+
+    function filaDetalle(r, tipo='segmento', groupId='', rank=null){
+      const c = Number(r.contactados)||0, s = Number(r.consumieron)||0
+      const f = Number(r.facturacion)||0, k = Number(r.costo_envio)||0
+      const inv = k ? f/k : null
+      const esTotal = tipo === 'total'
+      const email = esTotal
+        ? (emailMap.get(normEmailKey(r.campana)) || {})
+        : r
+      const costoConv = esTotal ? (s ? k/s : null) : r.costo_por_conv
+      const pctConv = esTotal ? (c ? 100*s/c : null) : r.pct_conversion
+
+      const rowClass = esTotal ? ('tot total-row' + (rank && rank <= 3 && sortSelect.value !== 'recent' ? ' rank-row rank-' + rank : '')) : 'segment-row is-collapsed'
+      const toggle = esTotal && groupId
+        ? `<button type="button" class="row-toggle" data-toggle-group="${groupId}" aria-expanded="false" title="Mostrar u ocultar el detalle por segmento">+</button>`
+        : ''
+      return `<tr class="${rowClass}" ${esTotal && groupId ? `data-group-total="${groupId}"` : (!esTotal && groupId ? `data-parent-group="${groupId}"` : '')}>
+        <td>${fd(r.fecha_inicio)}</td>
+        <td class="campaign-name">${rank && sortSelect.value !== 'recent' ? `<span class="campaign-rank rank-${rank}" title="Puesto ${rank} según el criterio seleccionado">${rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : '#'+rank}</span>` : ''}${toggle}${r.campana||''}</td>
+        <td>${esTotal?'<span class="segment-tag">TOTAL</span>':`<span class="segment-tag">${r._seg}</span>`}</td><td>${r.canal||'—'}</td>
+        <td class="metric-activity">${fm(c)}</td><td class="metric-good">${fm(s)}</td><td class="metric-cost">${money(k)}</td>
+        <td class="metric-good">${fmM(f)}</td>
+        <td>${costoConv!=null?money(costoConv):'—'}</td>
+        <td class="metric-good">${pctConv!=null?String(Number(pctConv).toFixed(1)).replace('.',',')+' %':'—'}</td>
+        <td>${inv!=null?inv.toFixed(2):'—'}</td>
+        <td class="metric-activity">${fm(email.aperturas_totales)}</td>
+        <td class="metric-activity">${fm(email.aperturas_unicas)}</td>
+        <td class="metric-activity">${pctEmail(email.pct_apertura)}</td>
+        <td class="metric-activity">${fm(email.clics_totales)}</td>
+        <td class="metric-activity">${fm(email.clics_unicos)}</td>
+        <td class="metric-activity">${pctEmail(email.pct_clics)}</td>
+      </tr>`
+    }
+
+    // La fila TOTAL consolida únicamente las métricas comerciales de sus segmentos.
+    // Email general proviene de CAMP_EMAIL; cada hijo usa exclusivamente CAMP_EMAIL_SEG.
+    const gruposDetalle = new Map()
+    rows.forEach(r => {
+      const key = [r._fi, normEmailKey(r.campana), normEmailKey(r.canal)].join('||')
+      if (!gruposDetalle.has(key)) gruposDetalle.set(key, [])
+      gruposDetalle.get(key).push(r)
+    })
+
+    const metricFor = total => {
+      const c = Number(total.contactados)||0, s = Number(total.consumieron)||0
+      const f = Number(total.facturacion)||0, k = Number(total.costo_envio)||0
+      switch (sortSelect.value) {
+        case 'facturacion': return f
+        case 'consumieron': return s
+        case 'conversion': return c ? s/c : null
+        case 'costo_conv': return s ? k/s : null
+        case 'contactados': return c
+        case 'recent': return total._fi || ''
+        case 'roi': default: return k > 0 ? f/k : null
+      }
+    }
+
+    const gruposOrdenados = [...gruposDetalle.values()].map(grupo => {
+      const primero = grupo[0]
+      const total = grupo.reduce((a,r) => {
+        a.contactados += Number(r.contactados)||0
+        a.consumieron += Number(r.consumieron)||0
+        a.facturacion += Number(r.facturacion)||0
+        a.costo_envio += Number(r.costo_envio)||0
+        return a
+      }, { ...primero, contactados:0, consumieron:0, facturacion:0, costo_envio:0 })
+      return { grupo, total, score: metricFor(total) }
+    }).sort((a,b) => {
+      if (CAMP_TABLE_SORT.key) {
+        const emailValue = (total, field) => {
+          const em = emailMap.get(normEmailKey(total.campana)) || {}
+          return Number(em[field]) || 0
+        }
+        const valueFor = (entry, key) => {
+          const t = entry.total
+          const c = Number(t.contactados)||0, consumed = Number(t.consumieron)||0
+          const f = Number(t.facturacion)||0, k = Number(t.costo_envio)||0
+          switch(key) {
+            case 'fecha': return t._fi || ''
+            case 'campana': return String(t.campana||'').toLocaleLowerCase('es')
+            case 'segmento': return String(t._seg||'TOTAL').toLocaleLowerCase('es')
+            case 'canal': return String(t.canal||'').toLocaleLowerCase('es')
+            case 'contactados': return c
+            case 'consumieron': return consumed
+            case 'costo': return k
+            case 'facturacion': return f
+            case 'costo_conv': return consumed ? k/consumed : null
+            case 'conversion': return c ? consumed/c : null
+            case 'roi': return k ? f/k : null
+            case 'aperturas': return emailValue(t,'aperturas_totales')
+            case 'aperturas_unicas': return emailValue(t,'aperturas_unicas')
+            case 'pct_apertura': return emailValue(t,'pct_apertura')
+            case 'clics': return emailValue(t,'clics_totales')
+            case 'clics_unicos': return emailValue(t,'clics_unicos')
+            case 'pct_clics': return emailValue(t,'pct_clics')
+            default: return ''
+          }
+        }
+        const av = valueFor(a,CAMP_TABLE_SORT.key), bv = valueFor(b,CAMP_TABLE_SORT.key)
+        if (av == null && bv == null) return 0
+        if (av == null) return 1
+        if (bv == null) return -1
+        const cmp = typeof av === 'string' ? av.localeCompare(String(bv),'es',{numeric:true}) : av-bv
+        return (CAMP_TABLE_SORT.dir === 'asc' ? cmp : -cmp) || (b.total._fi||'').localeCompare(a.total._fi||'')
+      }
+      if (sortSelect.value === 'recent') return String(b.score||'').localeCompare(String(a.score||''))
+      const av = a.score, bv = b.score
+      if (av == null && bv == null) return (b.total._fi||'').localeCompare(a.total._fi||'')
+      if (av == null) return 1
+      if (bv == null) return -1
+      if (sortSelect.value === 'costo_conv' && av !== bv) return av-bv
+      return bv-av || (b.total._fi||'').localeCompare(a.total._fi||'')
+    })
+
+    const detalleHtml = gruposOrdenados.map(({grupo,total}, index) => {
+      const groupId = segRows.length ? 'camp-' + index : ''
+      const rank = index + 1
+      return filaDetalle(total,'total',groupId,rank) + (segRows.length ? grupo.map(r => filaDetalle(r,'segmento',groupId)).join('') : '')
+    }).join('')
+
+    document.getElementById('cf-tbody').innerHTML = detalleHtml || '<tr><td colspan="17">Sin resultados con esos filtros</td></tr>'
+    document.querySelectorAll('.campaign-table thead th[data-sort]').forEach(th => {
+      const key = th.dataset.sort
+      const baseLabel = th.dataset.baseLabel || th.textContent.replace(/[▲▼↕]/g,'').trim()
+      th.dataset.baseLabel = baseLabel
+      th.classList.toggle('sort-active', CAMP_TABLE_SORT.key === key)
+      th.innerHTML = baseLabel + (CAMP_TABLE_SORT.key === key ? `<span class="sort-arrow">${CAMP_TABLE_SORT.dir === 'asc' ? '▲' : '▼'}</span>` : '<span class="sort-arrow" style="opacity:.25">↕</span>')
+    })
+    document.getElementById('cf-tbody').querySelectorAll('[data-toggle-group]').forEach(button => {
+      button.addEventListener('click', () => {
+        const id = button.dataset.toggleGroup
+        const expanded = button.getAttribute('aria-expanded') === 'true'
+        document.getElementById('cf-tbody').querySelectorAll(`[data-parent-group="${id}"]`).forEach(row => row.classList.toggle('is-collapsed', expanded))
+        button.setAttribute('aria-expanded', String(!expanded))
+        button.textContent = expanded ? '+' : '−'
+        button.title = expanded ? 'Mostrar detalle por segmento' : 'Ocultar detalle por segmento'
+      })
+    })
+
+    const filterCount = [q.value,selCanal.value,selSeg.value,desde.value,hasta.value].filter(Boolean).length
+    document.getElementById('cf-filter-summary').innerHTML = `<strong>${fm(rows.length)} filas</strong> visibles · ${filterCount ? filterCount+' filtros aplicados' : 'sin filtros aplicados'}`
+
+    const sortLabels = {roi:'Mayor ROI',facturacion:'Mayor facturación',consumieron:'Más consumos',conversion:'Mejor conversión',costo_conv:'Menor costo por conversión',contactados:'Mayor alcance',recent:'Más recientes'}
+    const headerLabels = {fecha:'Fecha',campana:'Campaña',segmento:'Segmento',canal:'Canal',contactados:'Envíos',consumieron:'Consumieron',costo:'Costo',facturacion:'Facturación',costo_conv:'Costo por conversión',conversion:'Conversión',roi:'ROI',aperturas:'Aperturas',aperturas_unicas:'Aperturas únicas',pct_apertura:'% apertura',clics:'Clics',clics_unicos:'Clics únicos',pct_clics:'% clics'}
+    const ordenActual = CAMP_TABLE_SORT.key
+      ? headerLabels[CAMP_TABLE_SORT.key] + (CAMP_TABLE_SORT.dir === 'asc' ? ' ↑' : ' ↓')
+      : (sortLabels[sortSelect.value] || 'Mayor ROI')
+    document.getElementById('cf-note').textContent = rows.length + ' filas · orden: ' + ordenActual + ' · hacé clic en un encabezado para cambiarlo'
+
+    chipHost.querySelectorAll('.chip').forEach(b => {
+      const empty = !(selSeg.value||'')
+      b.classList.toggle('on',
+        (b.dataset.seg||'') === (selSeg.value||'') ||
+        (b.dataset.seg==='' && empty)
+      )
+    })
+
+    if (charts.campPie) charts.campPie.destroy()
+    if (charts.campCanal) charts.campCanal.destroy()
+    if (charts.campSem) charts.campSem.destroy()
+
+    if (window.Chart) {
+      if (canalKeys.length) {
+        charts.campPie = new Chart(document.getElementById('chartCampPie'), {
+          type: 'doughnut',
+          data: {
+            labels: canalKeys,
+            datasets: [{ data: canalKeys.map(k => byC[k].c), backgroundColor: ['#fff000','#e57373','#64b5f6','#81c784','#ffb74d'] }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'right' },
+              datalabels: undefined
+            }
+          },
+          plugins: [{
+            id: 'pieLabels',
+            afterDraw(chart) {
+              const {ctx} = chart
+              chart.data.datasets.forEach((ds, i) => {
+                const meta = chart.getDatasetMeta(i)
+                const total = ds.data.reduce((a,b)=>a+b,0) || 1
+                meta.data.forEach((pt, j) => {
+                  const v = ds.data[j]
+                  if (!v) return
+                  const {x,y} = pt.tooltipPosition()
+                  ctx.fillStyle = '#1d1d1b'
+                  ctx.font = '11px system-ui'
+                  ctx.textAlign = 'center'
+                  ctx.fillText(((100*v)/total).toFixed(0)+'%', x, y)
+                })
+              })
+            }
+          }]
+        })
+
+        charts.campCanal = new Chart(document.getElementById('chartCampCanal'), {
+          type: 'bar',
+          data: {
+            labels: canalKeys,
+            datasets: [{
+              label: '% conversión',
+              data: canalKeys.map(k => byC[k].c ? Math.round(1000*byC[k].s/byC[k].c)/10 : 0),
+              backgroundColor: '#fff000', borderColor: '#1d1d1b', borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: ctx => ctx.parsed.y + '%' } }
+            },
+            scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' } } }
+          },
+          plugins: [{
+            id: 'barLabels',
+            afterDatasetsDraw(chart) {
+              const {ctx} = chart
+              chart.data.datasets.forEach((ds, i) => {
+                const meta = chart.getDatasetMeta(i)
+                meta.data.forEach((pt, j) => {
+                  const v = ds.data[j]
+                  ctx.fillStyle = '#1d1d1b'
+                  ctx.font = '11px system-ui'
+                  ctx.textAlign = 'center'
+                  ctx.fillText(v + '%', pt.x, pt.y - 6)
+                })
+              })
+            }
+          }]
+        })
+      }
+
+      if (semKeys.length) {
+        charts.campSem = new Chart(document.getElementById('chartCampSem'), {
+          type: 'bar',
+          data: {
+            labels: semKeys.map(k => bySem[k].meta.label),
+            datasets: [
+              { type:'bar', label:'Envíos', data: semKeys.map(k => bySem[k].c), backgroundColor:'rgba(100,181,246,0.7)', yAxisID:'y' },
+              { type:'bar', label:'Consumieron', data: semKeys.map(k => bySem[k].s), backgroundColor:'rgba(19,122,59,0.75)', yAxisID:'y' },
+              { type:'line', label:'% conv', data: semKeys.map(k => bySem[k].c ? Math.round(1000*bySem[k].s/bySem[k].c)/10 : 0), borderColor:'#c62828', backgroundColor:'#c62828', yAxisID:'y1', tension:0.2 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode:'index', intersect:false },
+            plugins: {
+              legend: { position: 'top' },
+              tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.dataset.yAxisID==='y1' ? ctx.parsed.y+'%' : fm(ctx.parsed.y)) } }
+            },
+            scales: {
+              y: { beginAtZero: true, position:'left', title:{display:true, text:'Cuentas'} },
+              y1: { beginAtZero: true, position:'right', grid:{drawOnChartArea:false}, ticks:{callback:v=>v+'%'}, title:{display:true, text:'% conv'} }
+            }
+          },
+          plugins: [{
+            id:'weeklyValueLabels',
+            afterDatasetsDraw(chart){
+              const ctx=chart.ctx
+              chart.data.datasets.forEach((ds,i)=>{
+                const meta=chart.getDatasetMeta(i)
+                if(meta.hidden) return
+                meta.data.forEach((point,j)=>{
+                  const value=ds.data[j]
+                  if(value==null || !Number.isFinite(Number(value))) return
+                  ctx.save(); ctx.font='10px DM Sans, sans-serif'; ctx.textAlign='center'
+                  ctx.fillStyle='#56616d'
+                  ctx.fillText(ds.yAxisID==='y1' ? Number(value).toFixed(1)+'%' : Number(value).toLocaleString('es-AR'), point.x, point.y - (ds.type==='line'?9:5))
+                  ctx.restore()
+                })
+              })
+            }
+          }]
+        })
+      }
+    }
+  }
+
+  function descargar(){
+    if (!window.XLSX) {
+      alert('No se pudo cargar el módulo de Excel. Revisá tu conexión e intentá nuevamente.');
+      return;
+    }
+
+    // Exporta los registros filtrados como un libro XLSX real (no CSV),
+    // con fechas, cantidades, importes y porcentajes como valores tipados.
+    const rows = filtrar().sort((a,b)=>(a._fi||'').localeCompare(b._fi||''));
+    const n = v => (v == null || v === '' || !Number.isFinite(Number(v))) ? null : Number(v);
+    const dateValue = v => {
+      if (!v) return null;
+      const m = String(v).slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return m ? new Date(Number(m[1]), Number(m[2])-1, Number(m[3])) : null;
+    };
+    const pct = v => n(v) == null ? null : Number(v) / 100;
+
+    const detail = [[
+      'Fecha','Campaña','Segmento ESPI','Canal','Envíos','Consumieron',
+      'Costo de envío','Facturación','Costo por conversión','Conversión',
+      'Facturación por peso invertido','Ciclo','Semana',
+      'Aperturas totales','Aperturas únicas','% apertura',
+      'Clics totales','Clics únicos','% clics'
+    ]];
+
+    rows.forEach(r => {
+      const c = n(r.contactados) || 0;
+      const consumed = n(r.consumieron) || 0;
+      const revenue = n(r.facturacion) || 0;
+      const cost = n(r.costo_envio) || 0;
+      const w = semanaCiclo(r._fi);
+      detail.push([
+        dateValue(r._fi), r.campana || '', r._seg || '', r.canal || '',
+        c, consumed, cost, revenue,
+        n(r.costo_por_conv), c ? consumed/c : null,
+        cost ? revenue/cost : null,
+        w ? w.ciclo : '', w ? w.semana : null,
+        n(r.aperturas_totales), n(r.aperturas_unicas), pct(r.pct_apertura),
+        n(r.clics_totales), n(r.clics_unicos), pct(r.pct_clics)
+      ]);
+    });
+
+    const wsDetail = XLSX.utils.aoa_to_sheet(detail, {cellDates:true});
+    wsDetail['!cols'] = [
+      {wch:13},{wch:48},{wch:18},{wch:14},{wch:13},{wch:14},
+      {wch:18},{wch:20},{wch:20},{wch:14},{wch:25},{wch:13},
+      {wch:10},{wch:17},{wch:17},{wch:14},{wch:15},{wch:15},{wch:12}
+    ];
+    wsDetail['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(0,detail.length-1),c:18}})};
+    wsDetail['!freeze'] = {xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft',state:'frozen'};
+
+    const setFormat = (ws, col, fmt, firstRow=2) => {
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+      for (let r=firstRow-1; r<=range.e.r; r++) {
+        const cell = ws[XLSX.utils.encode_cell({r,c:col})];
+        if (cell && cell.v != null) cell.z = fmt;
+      }
+    };
+    setFormat(wsDetail,0,'dd/mm/yyyy');
+    [6,7,8].forEach(c=>setFormat(wsDetail,c,'$ #,##0.00;[Red]-$ #,##0.00'));
+    [9,15,18].forEach(c=>setFormat(wsDetail,c,'0.00%'));
+    setFormat(wsDetail,10,'0.00');
+    [4,5,13,14,16,17].forEach(c=>setFormat(wsDetail,c,'#,##0'));
+
+    // Resumen por canal: agrega exactamente los registros incluidos en el filtro.
+    const byC = agg(rows, r => r.canal || '—');
+    const canalData = [['Canal','Envíos','Consumieron','Costo de envío','Facturación','% conversión','Facturación por peso invertido']];
+    Object.keys(byC).sort().forEach(k => {
+      const x = byC[k];
+      canalData.push([k,x.c,x.s,x.k,x.f,x.c?x.s/x.c:null,x.k?x.f/x.k:null]);
+    });
+    const wsCanal = XLSX.utils.aoa_to_sheet(canalData);
+    wsCanal['!cols'] = [{wch:18},{wch:14},{wch:15},{wch:20},{wch:20},{wch:16},{wch:30}];
+    wsCanal['!autofilter'] = {ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(0,canalData.length-1),c:6}})};
+    wsCanal['!freeze'] = {xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft',state:'frozen'};
+    [3,4].forEach(c=>setFormat(wsCanal,c,'$ #,##0.00;[Red]-$ #,##0.00'));
+    setFormat(wsCanal,5,'0.00%'); setFormat(wsCanal,6,'0.00');
+    [1,2].forEach(c=>setFormat(wsCanal,c,'#,##0'));
+
+    // Resumen por ciclo/semana.
+    const bySem = {};
+    rows.forEach(r => {
+      const w = semanaCiclo(r._fi);
+      if (!w) return;
+      if (!bySem[w.key]) bySem[w.key] = {c:0,s:0,f:0,k:0,meta:w};
+      bySem[w.key].c += Number(r.contactados)||0;
+      bySem[w.key].s += Number(r.consumieron)||0;
+      bySem[w.key].f += Number(r.facturacion)||0;
+      bySem[w.key].k += Number(r.costo_envio)||0;
+    });
+    const semData = [['Ciclo','Semana','Rango','Envíos','Consumieron','Facturación','Costo de envío','% conversión','Facturación por peso invertido']];
+    Object.keys(bySem).sort((a,b)=>bySem[a].meta.sort-bySem[b].meta.sort).forEach(k=>{
+      const x=bySem[k];
+      semData.push([x.meta.ciclo,x.meta.semana,x.meta.label,x.c,x.s,x.f,x.k,x.c?x.s/x.c:null,x.k?x.f/x.k:null]);
+    });
+    const wsSem = XLSX.utils.aoa_to_sheet(semData);
+    wsSem['!cols'] = [{wch:14},{wch:10},{wch:22},{wch:14},{wch:15},{wch:20},{wch:20},{wch:16},{wch:30}];
+    wsSem['!autofilter'] = {ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(0,semData.length-1),c:8}})};
+    wsSem['!freeze'] = {xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft',state:'frozen'};
+    [5,6].forEach(c=>setFormat(wsSem,c,'$ #,##0.00;[Red]-$ #,##0.00'));
+    setFormat(wsSem,7,'0.00%'); setFormat(wsSem,8,'0.00');
+    [1,3,4].forEach(c=>setFormat(wsSem,c,'#,##0'));
+
+    // Hoja independiente con las métricas generales de email por campaña.
+    // Estas cifras salen de informe_campanas_email (no de las filas segmentadas),
+    // igual que las que se muestran en la fila TOTAL de la tabla del dashboard.
+    const emailCampaigns = new Map();
+    rows.forEach(r => {
+      const key = normEmailKey(r.campana);
+      if (!key || emailCampaigns.has(key)) return;
+      emailCampaigns.set(key, r);
+    });
+
+    const emailData = [[
+      'Fecha','Campaña','Canal',
+      'Aperturas totales','Aperturas únicas','% apertura',
+      'Clics totales','Clics únicos','% clics'
+    ]];
+
+    [...emailCampaigns.entries()]
+      .sort((a,b) => String(a[1]._fi||'').localeCompare(String(b[1]._fi||'')) ||
+        String(a[1].campana||'').localeCompare(String(b[1].campana||''),'es'))
+      .forEach(([key, r]) => {
+        const em = emailMap.get(key) || {};
+        emailData.push([
+          dateValue(r._fi), r.campana || '', r.canal || '',
+          n(em.aperturas_totales), n(em.aperturas_unicas), pct(em.pct_apertura),
+          n(em.clics_totales), n(em.clics_unicos), pct(em.pct_clics)
+        ]);
+      });
+
+    const wsEmail = XLSX.utils.aoa_to_sheet(emailData, {cellDates:true});
+    wsEmail['!cols'] = [
+      {wch:13},{wch:48},{wch:16},{wch:19},{wch:18},
+      {wch:14},{wch:16},{wch:15},{wch:12}
+    ];
+    wsEmail['!autofilter'] = {ref:XLSX.utils.encode_range({
+      s:{r:0,c:0},e:{r:Math.max(0,emailData.length-1),c:8}
+    })};
+    wsEmail['!freeze'] = {xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft',state:'frozen'};
+    setFormat(wsEmail,0,'dd/mm/yyyy');
+    [5,8].forEach(c=>setFormat(wsEmail,c,'0.00%'));
+    [3,4,6,7].forEach(c=>setFormat(wsEmail,c,'#,##0'));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsDetail, 'Detalle campañas');
+    XLSX.utils.book_append_sheet(wb, wsEmail, 'Aperturas y clics email');
+    XLSX.utils.book_append_sheet(wb, wsCanal, 'Resumen por canal');
+    XLSX.utils.book_append_sheet(wb, wsSem, 'Resumen semanal');
+    wb.Props = {
+      Title:'Informe de campañas Sucrédito',
+      Subject:'Detalle y resúmenes de campañas filtradas',
+      Author:'Sucrédito',
+      CreatedDate:new Date()
+    };
+    XLSX.writeFile(wb, 'campanas_filtrado.xlsx', {bookType:'xlsx',cellDates:true,compression:true});
+  }
+
+  function bind(){
+    ;[q, selCanal, selSeg, desde, hasta, sortSelect].forEach(el => {
+      const saveAndPaint = () => {
+        if (el === sortSelect) CAMP_TABLE_SORT = { key:null, dir:'desc' }
+        CAMP_FILTER_STATE = { q:q.value, canal:selCanal.value, seg:selSeg.value, desde:desde.value, hasta:hasta.value, sort:sortSelect.value }
+        pintar()
+      }
+      el.addEventListener('input', saveAndPaint)
+      el.addEventListener('change', saveAndPaint)
+    })
+
+    chipHost.querySelectorAll('.chip').forEach(b => {
+      b.onclick = () => {
+        selSeg.value = b.dataset.seg || ''
+        CAMP_FILTER_STATE.seg = selSeg.value
+        pintar()
+      }
+    })
+
+    document.getElementById('cf-reset').onclick = () => {
+      q.value=''
+      selCanal.value=''
+      selSeg.value=''
+      desde.value=''
+      hasta.value=''
+      sortSelect.value='roi'
+      CAMP_FILTER_STATE = { q:'', canal:'', seg:'', desde:'', hasta:'', sort:'roi' }
+      CAMP_TABLE_SORT = { key:null, dir:'desc' }
+      pintar()
+    }
+
+    document.getElementById('cf-xls').onclick = descargar
+    document.querySelectorAll('.campaign-table thead th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort
+        CAMP_TABLE_SORT = {
+          key,
+          dir: CAMP_TABLE_SORT.key === key && CAMP_TABLE_SORT.dir === 'desc' ? 'asc' : 'desc'
+        }
+        pintar()
+      })
+    })
+  }
+
+  bind()
+  pintar()
+}
+
+initAuth()
+
+
+
+
+</script>
+<script>
+/* wire AI dock (placeholder) */
+(function(){
+  const btn = document.getElementById('btn-ai');
+  const panel = document.getElementById('ai-panel');
+  if (btn && panel) {
+    btn.addEventListener('click', () => panel.classList.toggle('hidden'));
+  }
+})();
+</script>
+</body>
+</html>
