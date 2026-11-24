@@ -298,6 +298,19 @@ tbody tr:hover td { background:#fafbfc; }
  .campaign-table td.campaign-name { min-width:190px; }
 }
 
+
+/* Inteligencia de cartera */
+.intel-heading { margin:22px 0 10px; font-size:16px; letter-spacing:-.02em; }
+.intel-sub { color:var(--mu); font-size:12px; margin:-4px 0 12px; }
+.intel-card { background:#fff; border:1px solid var(--bd); border-radius:14px; padding:16px; box-shadow:0 3px 14px rgba(30,42,56,.045); }
+.intel-card h3 { margin:0 0 7px; font-size:13px; color:#39434e; }
+.intel-card p { margin:0; font-size:13px; line-height:1.55; color:#68717d; }
+.intel-card strong { color:#20242a; }
+.intel-card.good { border-left:4px solid #16834a; }
+.intel-card.warn { border-left:4px solid #d97706; }
+.intel-card.info { border-left:4px solid #2867b2; }
+.intel-card.neutral { border-left:4px solid #aab1ba; }
+
 </style>
 </head>
 <body>
@@ -325,7 +338,7 @@ tbody tr:hover td { background:#fafbfc; }
     <div class="brand">
       <div class="mark">TSC</div>
       <div>
-        <h1>Informe diario</h1>
+        <h1>Inteligencia de cartera</h1>
         <div id="subtitle">—</div>
       </div>
     </div>
@@ -344,7 +357,7 @@ tbody tr:hover td { background:#fafbfc; }
     <button type="button" data-p="altas">Altas</button>
     <button type="button" data-p="cobranza">Cobranza</button>
     <button type="button" data-p="campanas">Campañas</button>
-    <button type="button" data-p="diario">Informe diario</button>
+    <button type="button" data-p="inteligencia">Inteligencia de cartera</button>
   </nav>
   <main>
     <div id="error-box" class="hidden"></div>
@@ -358,28 +371,31 @@ tbody tr:hover td { background:#fafbfc; }
     <div id="panel-cobranza" class="panel"></div>
     <div id="panel-campanas" class="panel"></div>
   
-    <div id="panel-diario" class="panel">
+    <div id="panel-inteligencia" class="panel">
       <div class="card">
-        <h2 style="margin-top:0">Informe diario de resúmenes</h2>
+        <h2 style="margin-top:0">Inteligencia de cartera</h2>
         <div id="daily-status" class="note">Sin datos</div>
         <p class="note" id="meta-line">—</p>
       </div>
-      <h2>Resumen del período</h2>
+      <h2>Indicadores de cartera</h2>
       <div class="seg" id="seg-btns">
         <button type="button" class="on" data-s="T">Total</button>
         <button type="button" data-s="C">Cartera</button>
         <button type="button" data-s="P">PI</button>
       </div>
       <div class="g4" id="tiles"></div>
-      <h2>Estados: inicio → hoy</h2>
+      <h2 class="intel-heading">Alertas y oportunidades</h2>
+      <p class="intel-sub">Lectura automática de los movimientos detectados en la base disponible.</p>
+      <div id="intelligence-insights" class="insight-grid"></div>
+      <h2>Movimiento de estados: inicio del período → hoy</h2>
       <div class="card"><table id="tbl-estados"><thead></thead><tbody></tbody></table></div>
-      <h2>Mora: inicio → hoy</h2>
+      <h2>Evolución de mora: inicio del período → hoy</h2>
       <div class="card"><table id="tbl-mora"><thead></thead><tbody></tbody></table></div>
-      <h2>Cobranzas (período cargado)</h2>
+      <h2>Gestión de cobranza</h2>
       <div class="g4" id="tiles-cob"></div>
-      <h2>Altas (últimos períodos)</h2>
+      <h2>Activación de nuevas cuentas</h2>
       <div class="card"><table id="tbl-altas"><thead></thead><tbody></tbody></table></div>
-      <p class="note">Datos leídos directamente desde las vistas de Supabase del informe diario.</p>
+      <p class="note">Indicadores calculados con los datos disponibles en las vistas de cartera de Supabase.</p>
       <p id="daily-error-box" class="err hidden"></p>
     </div>
 
@@ -489,7 +505,8 @@ function activatePanel(view, updateUrl=true){
   }
 }
 document.querySelectorAll('#tabs button').forEach(b=>{b.onclick=()=>activatePanel(b.dataset.p,true)});
-activatePanel(new URLSearchParams(window.location.search).get('vista')||'conclusiones',false);
+const initialView = new URLSearchParams(window.location.search).get('vista');
+activatePanel(initialView === 'diario' ? 'inteligencia' : (initialView || 'conclusiones'),false);
 document.getElementById('btn-share').onclick=async()=>{
   const url=window.location.href;
   try{
@@ -1734,7 +1751,7 @@ async function refrescarDiario() {
   const st = document.getElementById('daily-status')
   const errBox = document.getElementById('daily-error-box')
   show(errBox, false)
-  st.textContent = 'Actualizando desde Supabase…'
+  st.textContent = 'Actualizando indicadores de cartera desde Supabase…'
   
 
   try {
@@ -1757,7 +1774,7 @@ async function refrescarDiario() {
 
     renderDiarioAll()
     const m = dailyCache.meta
-    st.textContent = 'Actualizado ' + new Date().toLocaleString('es-AR')
+    st.textContent = 'Datos actualizados ' + new Date().toLocaleString('es-AR')
     document.getElementById('meta-line').textContent = m
       ? `Período actual: ${fm(m.filas_periodo_actual)} cuentas · Inicio: ${fm(m.filas_periodo_inicio)} · ` +
         `Clientes: ${fm(m.filas_clientebase)} · Últ. compra: ${m.max_fechacompra || '—'} · ` +
@@ -1766,7 +1783,7 @@ async function refrescarDiario() {
   } catch (e) {
     errBox.textContent = 'Error al consultar: ' + e.message
     show(errBox, true)
-    st.textContent = 'Error al actualizar'
+    st.textContent = 'Error al actualizar los indicadores'
   } finally {
     
   }
@@ -1775,10 +1792,38 @@ async function refrescarDiario() {
 
 function renderDiarioAll() {
   renderResumenDiario()
+  renderInteligenciaInsights()
   renderEstadosDiario()
   renderMoraDiario()
   renderCobranzaDiario()
   renderAltasDiario()
+}
+
+function renderInteligenciaInsights() {
+  const host = document.getElementById('intelligence-insights')
+  if (!host) return
+  const r = rowResumenDiario(dailySeg) || rowResumenDiario('T')
+  if (!r) {
+    host.innerHTML = '<div class="intel-card neutral"><h3>Esperando datos</h3><p>Cuando se actualicen las vistas de cartera, acá aparecerán alertas y oportunidades calculadas.</p></div>'
+    return
+  }
+  const n = v => Number(v) || 0
+  const total = n(r.cuentas_inicio), mora = n(r.hoy_mora), bajas = n(r.hoy_baja), activa = n(r.hoy_activa)
+  const subset = dailyCache.estados.filter(x => dailySeg === 'T' || x.segmento === dailySeg)
+  const entraronMora = subset.filter(x => Number(x.mora_inicio) === 0 && Number(x.mora_hoy) > 0 && x.estado_hoy !== 'B').reduce((a,x)=>a+n(x.cuentas),0)
+  const salieronMora = subset.filter(x => Number(x.mora_inicio) > 0 && Number(x.mora_hoy) === 0 && x.estado_hoy !== 'B').reduce((a,x)=>a+n(x.cuentas),0)
+  const c = dailyCache.cobranza || {}
+  const recupero = n(c.a_recuperar) ? 100*n(c.recuperado)/n(c.a_recuperar) : null
+  const altas = dailyCache.altas && dailyCache.altas.length ? dailyCache.altas[0] : null
+  const cards = [
+    {tone:mora/Math.max(total,1)>.15?'warn':'good',title:'Peso de la mora actual',value:p1(mora,total),body:`Hay <strong>${fm(mora)} cuentas</strong> en mora sobre una base inicial de ${fm(total)}. ${mora/Math.max(total,1)>.15?'Conviene priorizar acciones preventivas y de recupero.':'Conviene seguir monitoreando el indicador para detectar desvíos.'}`},
+    {tone:entraronMora>salieronMora?'warn':'good',title:'Movimiento de mora',value:fm(entraronMora)+' ingresaron · '+fm(salieronMora)+' salieron',body:`En el período, ${fm(entraronMora)} cuentas pasaron de sin mora a mora y ${fm(salieronMora)} salieron de mora. Saldo del movimiento: <strong>${fm(entraronMora-salieronMora)}</strong> cuentas.`},
+    {tone:'info',title:'Cuentas activas',value:fm(activa),body:`Representan ${p1(activa,total)} de las cuentas que estaban al inicio del período. Permite dimensionar la cartera que conserva actividad.`},
+    {tone:bajas/Math.max(total,1)>.05?'warn':'neutral',title:'Bajas de cartera',value:fm(bajas),body:`Las bajas equivalen al ${p1(bajas,total)} de la base inicial. Conviene revisar su composición y evolución.`},
+    {tone:recupero==null?'neutral':(recupero>=50?'good':'warn'),title:'Efectividad de cobranza',value:recupero==null?'Sin dato':recupero.toFixed(1).replace('.',',')+' %',body:`Se recuperaron <strong>${fm(Math.round(n(c.recuperado)))}</strong> sobre ${fm(Math.round(n(c.a_recuperar)))} a recuperar, con ${fm(c.cuentas_que_pagaron)} cuentas que pagaron.`},
+    {tone:'info',title:'Activación de altas',value:altas?(altas.pct_uso==null?'Sin dato':String(altas.pct_uso).replace('.',',')+' %'):'Sin datos',body:altas?`En el período de venta ${altas.periodoventa||'más reciente'} ingresaron ${fm(altas.altas)} cuentas; ${fm(altas.con_uso)} registran uso.`:'Todavía no hay períodos de altas disponibles para analizar.'}
+  ]
+  host.innerHTML = cards.map(x=>`<article class="intel-card ${x.tone}"><h3>${x.title}</h3><p><strong>${x.value}</strong><br>${x.body}</p></article>`).join('')
 }
 
 function rowResumenDiario(s) {
