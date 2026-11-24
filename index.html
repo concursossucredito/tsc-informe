@@ -437,11 +437,11 @@ tbody tr:hover td { background:#fafbfc; }
         </div>
         <div class="card">
           <h3>Préstamos otorgados · indicador independiente</h3>
-          <p class="note">No se asignan a Cartera, PI, Inactivos, Altas u Otros porque las cuentas de esta fuente no están vinculadas con esos universos.</p>
+          <p class="note">No se asignan a segmentos porque esta fuente no está vinculada con esos universos. La variación compara cada período con el anterior; 12-2026 es parcial (iniciado el 24/11).</p>
           <div class="tbl-wrap">
             <table id="tbl-intel-loans">
-              <thead><tr><th>Período</th><th>Clientes</th><th>Operaciones</th><th>Importe otorgado</th><th>Total financiado</th><th>Desde</th><th>Hasta</th></tr></thead>
-              <tbody><tr><td colspan="7">Esperando datos…</td></tr></tbody>
+              <thead><tr><th>Período</th><th>Clientes</th><th>Var. clientes</th><th>Operaciones</th><th>Var. operaciones</th><th>Importe otorgado</th><th>Var. importe</th><th>Total financiado</th><th>Var. financiado</th><th>Desde</th><th>Hasta</th></tr></thead>
+              <tbody><tr><td colspan="11">Esperando datos…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -2040,16 +2040,34 @@ function renderActividadSegmentada(data) {
     }).join('') || '<tr><td colspan="5">Sin datos mensuales</td></tr>'
   }
 
-  const loans = Array.isArray(data.prestamos) ? data.prestamos : []
-  loansBody.innerHTML = loans.map(r => `<tr>
-    <td>${r.periodo || '—'}</td>
-    <td>${fm(r.clientes)}</td>
-    <td>${fm(r.operaciones)}</td>
-    <td>${fmM(r.importe_otorgado)}</td>
-    <td>${fmM(r.total_financiado)}</td>
-    <td>${fd(r.primera_fecha)}</td>
-    <td>${fd(r.ultima_fecha)}</td>
-  </tr>`).join('') || '<tr><td colspan="7">Sin préstamos registrados</td></tr>'
+  const loans = Array.isArray(data.prestamos) ? [...data.prestamos] : []
+  const periodKey = value => {
+    const m = String(value || '').match(/^(\d{1,2})-(\d{4})$/)
+    return m ? Number(m[2]) * 100 + Number(m[1]) : 0
+  }
+  loans.sort((a,b) => periodKey(a.periodo) - periodKey(b.periodo))
+  const loanDelta = (value, previous) => {
+    const current = num(value), prior = num(previous)
+    if (previous == null || prior === 0) return '—'
+    const pct = 100 * (current - prior) / prior
+    return (pct > 0 ? '+' : '') + pct.toFixed(1).replace('.', ',') + ' %'
+  }
+  loansBody.innerHTML = loans.map((r,i) => {
+    const prev = i > 0 ? loans[i-1] : null
+    return `<tr>
+      <td>${r.periodo || '—'}</td>
+      <td>${fm(r.clientes)}</td>
+      <td>${prev ? loanDelta(r.clientes, prev.clientes) : '—'}</td>
+      <td>${fm(r.operaciones)}</td>
+      <td>${prev ? loanDelta(r.operaciones, prev.operaciones) : '—'}</td>
+      <td>${fmM(r.importe_otorgado)}</td>
+      <td>${prev ? loanDelta(r.importe_otorgado, prev.importe_otorgado) : '—'}</td>
+      <td>${fmM(r.total_financiado)}</td>
+      <td>${prev ? loanDelta(r.total_financiado, prev.total_financiado) : '—'}</td>
+      <td>${fd(r.primera_fecha)}</td>
+      <td>${fd(r.ultima_fecha)}</td>
+    </tr>`
+  }).join('') || '<tr><td colspan="11">Sin préstamos registrados</td></tr>'
 
   const byGroup = Object.fromEntries(rows.map(r => [r.grupo,r]))
   const cartera = byGroup.CARTERA || {}, piGroup = byGroup.PI || {}, inactivos = byGroup.INACTIVO || {}, otrosGroup = byGroup.OTRO_CLIENTE_BASE || {}
