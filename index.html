@@ -300,6 +300,22 @@ tbody tr:hover td { background:#fafbfc; }
 
 
 /* Inteligencia de cartera */
+.intel-commercial { margin: 18px 0 26px; }
+.intel-segment-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(175px,1fr)); gap:10px; margin:12px 0; }
+.intel-segment-card { background:#fff; border:1px solid var(--bd); border-radius:12px; padding:13px 14px; }
+.intel-segment-card small { display:block; color:var(--mu); font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+.intel-segment-card b { display:block; margin:5px 0 2px; font-size:22px; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+.intel-segment-card span { color:var(--mu); font-size:11px; }
+.intel-commercial .card { margin-top:12px; }
+.intel-commercial .tbl-wrap { max-height:420px; }
+.intel-commercial table { min-width:950px; }
+.intel-commercial-insights { margin-top:12px; }
+@media(max-width:650px) {
+  .intel-segment-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .intel-segment-card { padding:11px; }
+  .intel-segment-card b { font-size:19px; }
+}
+/* Inteligencia de cartera */
 .intel-heading { margin:22px 0 10px; font-size:16px; letter-spacing:-.02em; }
 .intel-sub { color:var(--mu); font-size:12px; margin:-4px 0 12px; }
 .intel-card { background:#fff; border:1px solid var(--bd); border-radius:14px; padding:16px; box-shadow:0 3px 14px rgba(30,42,56,.045); }
@@ -377,6 +393,43 @@ tbody tr:hover td { background:#fafbfc; }
         <div id="daily-status" class="note">Sin datos</div>
         <p class="note" id="meta-line">—</p>
       </div>
+
+      <section class="intel-commercial">
+        <div class="section-intro">
+          <div>
+            <h2 style="margin:0">Actividad comercial y financiera</h2>
+            <p>Compras y débitos por grupo de clientes. Los préstamos otorgados se muestran por separado.</p>
+          </div>
+          <span id="intel-commercial-status" class="note">Consultando datos…</span>
+        </div>
+        <div id="intel-segment-cards" class="intel-segment-grid"></div>
+        <div class="card">
+          <h3>Detalle de actividad por grupo</h3>
+          <div class="tbl-wrap">
+            <table id="tbl-intel-segment">
+              <thead><tr>
+                <th>Grupo</th><th>Clientes</th><th>Con compras</th><th>% uso</th>
+                <th>Operaciones</th><th>Importe compras</th>
+                <th>Débito préstamos</th><th>Importe</th>
+                <th>Débito servicios</th><th>Importe</th>
+              </tr></thead>
+              <tbody><tr><td colspan="10">Esperando datos…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Préstamos otorgados · indicador independiente</h3>
+          <p class="note">No se asignan a Cartera, PI, Inactivos, Altas u Otros porque las cuentas de esta fuente no están vinculadas con esos universos.</p>
+          <div class="tbl-wrap">
+            <table id="tbl-intel-loans">
+              <thead><tr><th>Período</th><th>Clientes</th><th>Operaciones</th><th>Importe otorgado</th><th>Total financiado</th><th>Desde</th><th>Hasta</th></tr></thead>
+              <tbody><tr><td colspan="7">Esperando datos…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="intel-commercial-insights" class="insight-grid"></div>
+      </section>
+
       <h2>Indicadores de cartera</h2>
       <div class="seg" id="seg-btns">
         <button type="button" class="on" data-s="T">Total</button>
@@ -465,6 +518,7 @@ function enter(){
   show(document.getElementById('app-view'),true)
   load()
   refrescarDiario()
+  refrescarActividadSegmentada()
 }
 
 document.getElementById('btn-login').onclick = async ()=>{
@@ -490,7 +544,7 @@ document.getElementById('btn-login').onclick = async ()=>{
 }
 
 document.getElementById('btn-logout').onclick = ()=> sb.auth.signOut()
-document.getElementById('btn-refresh').onclick = ()=> { load(); refrescarDiario(); }
+document.getElementById('btn-refresh').onclick = ()=> { load(); refrescarDiario(); refrescarActividadSegmentada(); }
 
 function activatePanel(view, updateUrl=true){
   const buttons=[...document.querySelectorAll('#tabs button')];
@@ -1841,6 +1895,96 @@ function renderInteligenciaInsights() {
     {tone:'info',title:'Activación de altas',value:altas?(altas.pct_uso==null?'Sin dato':String(altas.pct_uso).replace('.',',')+' %'):'Sin datos',body:altas?`En el período de venta ${altas.periodoventa||'más reciente'} ingresaron ${fm(altas.altas)} cuentas; ${fm(altas.con_uso)} registran uso.`:'Todavía no hay períodos de altas disponibles para analizar.'}
   ]
   host.innerHTML = cards.map(x=>`<article class="intel-card ${x.tone}"><h3>${x.title}</h3><p><strong>${x.value}</strong><br>${x.body}</p></article>`).join('')
+}
+
+let actividadSegmentadaCache = null
+
+async function refrescarActividadSegmentada() {
+  const status = document.getElementById('intel-commercial-status')
+  if (status) status.textContent = 'Actualizando actividad…'
+  const { data, error } = await sb.rpc('obtener_inteligencia_cartera')
+  if (error) {
+    if (status) status.textContent = 'No se pudo consultar la actividad: ' + error.message
+    renderActividadSegmentada(null)
+    return
+  }
+  actividadSegmentadaCache = data
+  renderActividadSegmentada(data)
+  if (status) status.textContent = 'Actualizado ' + new Date().toLocaleString('es-AR')
+}
+
+function renderActividadSegmentada(data) {
+  const cards = document.getElementById('intel-segment-cards')
+  const body = document.querySelector('#tbl-intel-segment tbody')
+  const loansBody = document.querySelector('#tbl-intel-loans tbody')
+  const insights = document.getElementById('intel-commercial-insights')
+  if (!cards || !body || !loansBody || !insights) return
+
+  if (!data || !Array.isArray(data.grupos)) {
+    cards.innerHTML = ''
+    body.innerHTML = '<tr><td colspan="10">No hay datos disponibles. Revisá la función de consulta en Supabase.</td></tr>'
+    loansBody.innerHTML = '<tr><td colspan="7">Sin datos</td></tr>'
+    insights.innerHTML = ''
+    return
+  }
+
+  const rows = data.grupos
+  const order = ['CARTERA','PI','INACTIVO','ALTA_12_26','OTRO_CLIENTE_BASE']
+  rows.sort((a,b) => order.indexOf(a.grupo)-order.indexOf(b.grupo))
+  const num = v => Number(v) || 0
+  const labels = {
+    CARTERA:'Cartera',
+    PI:'Posibles inactivos (PI)',
+    INACTIVO:'Inactivos',
+    ALTA_12_26:'Altas 12-26',
+    OTRO_CLIENTE_BASE:'Otros clientes base'
+  }
+  cards.innerHTML = rows.map(r => {
+    const penetration = num(r.total_clientes) ? 100*num(r.clientes_con_compras)/num(r.total_clientes) : 0
+    return `<article class="intel-segment-card">
+      <small>${labels[r.grupo] || r.grupo}</small>
+      <b>${fm(r.clientes_con_compras)} <span>con compras</span></b>
+      <span>${fm(r.total_clientes)} cuentas · ${penetration.toFixed(1).replace('.',',')} % de uso</span>
+    </article>`
+  }).join('')
+
+  body.innerHTML = rows.map(r => {
+    const penetration = num(r.total_clientes) ? 100*num(r.clientes_con_compras)/num(r.total_clientes) : 0
+    return `<tr>
+      <td>${labels[r.grupo] || r.grupo}</td>
+      <td>${fm(r.total_clientes)}</td>
+      <td>${fm(r.clientes_con_compras)}</td>
+      <td>${penetration.toFixed(1).replace('.',',')} %</td>
+      <td>${fm(r.operaciones_compra)}</td>
+      <td>${fmM(r.importe_compras)}</td>
+      <td>${fm(r.clientes_con_debito_prestamo)}</td>
+      <td>${fmM(r.importe_debito_prestamo)}</td>
+      <td>${fm(r.clientes_con_debito_servicios)}</td>
+      <td>${fmM(r.importe_debito_servicios)}</td>
+    </tr>`
+  }).join('') || '<tr><td colspan="10">Sin datos</td></tr>'
+
+  const loans = Array.isArray(data.prestamos) ? data.prestamos : []
+  loansBody.innerHTML = loans.map(r => `<tr>
+    <td>${r.periodo || '—'}</td>
+    <td>${fm(r.clientes)}</td>
+    <td>${fm(r.operaciones)}</td>
+    <td>${fmM(r.importe_otorgado)}</td>
+    <td>${fmM(r.total_financiado)}</td>
+    <td>${fd(r.primera_fecha)}</td>
+    <td>${fd(r.ultima_fecha)}</td>
+  </tr>`).join('') || '<tr><td colspan="7">Sin préstamos registrados</td></tr>'
+
+  const byGroup = Object.fromEntries(rows.map(r => [r.grupo,r]))
+  const cartera = byGroup.CARTERA || {}, pi = byGroup.PI || {}, inactivos = byGroup.INACTIVO || {}, otros = byGroup.OTRO_CLIENTE_BASE || {}
+  const penetration = r => num(r.total_clientes) ? 100*num(r.clientes_con_compras)/num(r.total_clientes) : 0
+  const gap = penetration(cartera)-penetration(pi)
+  const insightCards = [
+    {tone:'info',title:'Brecha de consumo entre Cartera y PI',value:gap.toFixed(1).replace('.',',')+' puntos',body:`Cartera registra ${penetration(cartera).toFixed(1).replace('.',',')} % de clientes con compras frente a ${penetration(pi).toFixed(1).replace('.',',')} % en PI.`},
+    {tone:'warn',title:'Inactivos con compras',value:fm(inactivos.clientes_con_compras),body:'Cuentas clasificadas como Inactivos que registraron compras en las tablas actuales. Es una señal de actividad, no una confirmación de emisión futura.'},
+    {tone:'neutral',title:'Otros clientes base con compras',value:fm(otros.clientes_con_compras),body:'Se mantienen como población independiente. No se consideran reactivados sin validar su historia previa.'}
+  ]
+  insights.innerHTML = insightCards.map(x => `<article class="intel-card ${x.tone}"><h3>${x.title}</h3><p><strong>${x.value}</strong><br>${x.body}</p></article>`).join('')
 }
 
 function rowResumenDiario(s) {
