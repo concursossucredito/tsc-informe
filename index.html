@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>TSC · Datawarehouse</title>
+<title>TSC · Inteligencia de cartera</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -385,7 +385,7 @@ tbody tr:hover td { background:#fafbfc; }
       </div>
       <div class="g4" id="tiles"></div>
       <h2 class="intel-heading">Alertas y oportunidades</h2>
-      <p class="intel-sub">Lectura automática de los movimientos detectados en la base disponible.</p>
+      <p class="intel-sub">Análisis automático a partir de los datos de Supabase, sin inventar estimaciones.</p>
       <div id="intelligence-insights" class="insight-grid"></div>
       <h2>Movimiento de estados: inicio del período → hoy</h2>
       <div class="card"><table id="tbl-estados"><thead></thead><tbody></tbody></table></div>
@@ -1810,17 +1810,17 @@ function renderInteligenciaInsights() {
   const n = v => Number(v) || 0
   const total = n(r.cuentas_inicio), mora = n(r.hoy_mora), bajas = n(r.hoy_baja), activa = n(r.hoy_activa)
   const subset = dailyCache.estados.filter(x => dailySeg === 'T' || x.segmento === dailySeg)
-  const entraronMora = subset.filter(x => Number(x.mora_inicio) === 0 && Number(x.mora_hoy) > 0 && x.estado_hoy !== 'B').reduce((a,x)=>a+n(x.cuentas),0)
-  const salieronMora = subset.filter(x => Number(x.mora_inicio) > 0 && Number(x.mora_hoy) === 0 && x.estado_hoy !== 'B').reduce((a,x)=>a+n(x.cuentas),0)
+  const entraronMora = subset.filter(x => x.mora_inicio != null && x.mora_hoy != null && Number(x.mora_inicio) === 0 && Number(x.mora_hoy) > 0 && x.estado_hoy !== 'B').reduce((a,x)=>a+n(x.cuentas),0)
+  const salieronMora = subset.filter(x => x.mora_inicio != null && x.mora_hoy != null && Number(x.mora_inicio) > 0 && Number(x.mora_hoy) === 0 && x.estado_hoy !== 'B').reduce((a,x)=>a+n(x.cuentas),0)
   const c = dailyCache.cobranza || {}
   const recupero = n(c.a_recuperar) ? 100*n(c.recuperado)/n(c.a_recuperar) : null
   const altas = dailyCache.altas && dailyCache.altas.length ? dailyCache.altas[0] : null
   const cards = [
-    {tone:mora/Math.max(total,1)>.15?'warn':'good',title:'Peso de la mora actual',value:p1(mora,total),body:`Hay <strong>${fm(mora)} cuentas</strong> en mora sobre una base inicial de ${fm(total)}. ${mora/Math.max(total,1)>.15?'Conviene priorizar acciones preventivas y de recupero.':'Conviene seguir monitoreando el indicador para detectar desvíos.'}`},
+    {tone:'neutral',title:'Peso de la mora actual',value:p1(mora,total),body:`Hay <strong>${fm(mora)} cuentas</strong> en mora sobre una base inicial de ${fm(total)}. ${mora/Math.max(total,1)>.15?'Conviene priorizar acciones preventivas y de recupero.':'Conviene seguir monitoreando el indicador para detectar desvíos.'}`},
     {tone:entraronMora>salieronMora?'warn':'good',title:'Movimiento de mora',value:fm(entraronMora)+' ingresaron · '+fm(salieronMora)+' salieron',body:`En el período, ${fm(entraronMora)} cuentas pasaron de sin mora a mora y ${fm(salieronMora)} salieron de mora. Saldo del movimiento: <strong>${fm(entraronMora-salieronMora)}</strong> cuentas.`},
     {tone:'info',title:'Cuentas activas',value:fm(activa),body:`Representan ${p1(activa,total)} de las cuentas que estaban al inicio del período. Permite dimensionar la cartera que conserva actividad.`},
-    {tone:bajas/Math.max(total,1)>.05?'warn':'neutral',title:'Bajas de cartera',value:fm(bajas),body:`Las bajas equivalen al ${p1(bajas,total)} de la base inicial. Conviene revisar su composición y evolución.`},
-    {tone:recupero==null?'neutral':(recupero>=50?'good':'warn'),title:'Efectividad de cobranza',value:recupero==null?'Sin dato':recupero.toFixed(1).replace('.',',')+' %',body:`Se recuperaron <strong>${fm(Math.round(n(c.recuperado)))}</strong> sobre ${fm(Math.round(n(c.a_recuperar)))} a recuperar, con ${fm(c.cuentas_que_pagaron)} cuentas que pagaron.`},
+    {tone:'neutral',title:'Bajas de cartera',value:fm(bajas),body:`Las bajas equivalen al ${p1(bajas,total)} de la base inicial. Conviene revisar su composición y evolución.`},
+    {tone:'neutral',title:'Efectividad de cobranza',value:recupero==null?'Sin dato':recupero.toFixed(1).replace('.',',')+' %',body:`Se recuperaron <strong>${fm(Math.round(n(c.recuperado)))}</strong> sobre ${fm(Math.round(n(c.a_recuperar)))} a recuperar, con ${fm(c.cuentas_que_pagaron)} cuentas que pagaron.`},
     {tone:'info',title:'Activación de altas',value:altas?(altas.pct_uso==null?'Sin dato':String(altas.pct_uso).replace('.',',')+' %'):'Sin datos',body:altas?`En el período de venta ${altas.periodoventa||'más reciente'} ingresaron ${fm(altas.altas)} cuentas; ${fm(altas.con_uso)} registran uso.`:'Todavía no hay períodos de altas disponibles para analizar.'}
   ]
   host.innerHTML = cards.map(x=>`<article class="intel-card ${x.tone}"><h3>${x.title}</h3><p><strong>${x.value}</strong><br>${x.body}</p></article>`).join('')
