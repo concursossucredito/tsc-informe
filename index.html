@@ -300,6 +300,72 @@ tbody tr:hover td { background:#fafbfc; }
 
 
 
+
+/* Sistema visual unificado para todas las solapas */
+.panel { min-width:0; }
+.panel .card {
+  border:1px solid #e3e7eb;
+  border-radius:16px;
+  box-shadow:0 5px 18px rgba(30,42,56,.055);
+  padding:18px;
+  margin:0 0 16px;
+  background:#fff;
+}
+.panel .card h3 {
+  color:#303943;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.045em;
+  margin:18px 0 10px;
+  padding-bottom:9px;
+  border-bottom:1px solid #edf0f2;
+}
+.panel .card h3:first-child { margin-top:0; }
+.panel .card > table { min-width:560px; }
+.panel .card table { border-collapse:separate; border-spacing:0; }
+.panel .card th {
+  padding:11px 12px;
+  background:#f4f6f8;
+  color:#56616d;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.045em;
+  border-bottom:1px solid #dfe4e8;
+  white-space:nowrap;
+}
+.panel .card td {
+  padding:10px 12px;
+  border-bottom:1px solid #edf0f2;
+  color:#303943;
+}
+.panel .card tbody tr:nth-child(even):not(.tot):not(.res) td { background:#fafbfc; }
+.panel .card tbody tr:hover:not(.tot):not(.res) td { background:#fffbe1; }
+.panel .card tr.tot td {
+  background:#fff8cc;
+  color:#262626;
+  font-weight:800;
+  border-top:2px solid #e2d13a;
+  border-bottom:0;
+}
+.panel .card tr.res td {
+  background:#f1f4f7;
+  color:#26313c;
+  font-weight:800;
+  border-top:2px solid #cbd3dc;
+}
+.panel .tbl-wrap { border:1px solid #e5e9ed; border-radius:11px; }
+.panel .note { color:#77818c; line-height:1.5; }
+.panel .g4 { gap:12px; }
+.panel .tile { border-radius:13px; min-width:0; }
+.panel .chart-wrap { min-height:220px; }
+#panel-cobranza .cob-section { margin-top:20px; }
+#panel-cobranza .cob-total-note { margin:7px 0 13px; color:#77818c; font-size:11px; }
+@media(max-width:700px) {
+  .panel .card { padding:13px; border-radius:13px; }
+  .panel .card th, .panel .card td { padding:9px 10px; }
+  .panel .card > table { min-width:520px; }
+}
+
 </style>
 </head>
 <body>
@@ -684,34 +750,53 @@ function render(){
   const dias = P.cob_dias || []
 
   function cobTable(title, rows){
-    if(!rows.length) return `<p class="note">${title}: re-ejecutá el script para llenar detalle</p>`
-    return `<h3>${title}</h3><table>
-      <thead><tr><th></th><th>Cuentas</th><th>A recuperar</th><th>Recuperado</th><th>% recupero</th><th>Pagaron</th></tr></thead>
+    if(!rows.length) return `<section class="cob-section"><h3>${title}</h3><p class="note">Sin detalle disponible para este corte.</p></section>`
+    const total = rows.reduce((a,r)=>{
+      a.cuentas += Number(r.cuentas)||0;
+      a.a_rec += Number(r.a_rec)||0;
+      a.rec += Number(r.rec)||0;
+      a.pagaron += Number(r.pagaron)||0;
+      return a;
+    },{cuentas:0,a_rec:0,rec:0,pagaron:0});
+    return `<section class="cob-section"><h3>${title}</h3>
+      <div class="tbl-wrap"><table>
+      <thead><tr><th>Clasificación</th><th>Cuentas</th><th>A recuperar</th><th>Recuperado</th><th>% recupero</th><th>Pagaron</th></tr></thead>
       <tbody>${rows.map(r=>`<tr>
         <td>${r.k||'—'}</td><td>${fm(r.cuentas)}</td><td>${fmM(r.a_rec)}</td><td>${fmM(r.rec)}</td>
         <td>${pct(r.rec,r.a_rec)}</td><td>${fm(r.pagaron)}</td></tr>`).join('')}
-      </tbody></table>`
+        <tr class="tot"><td>TOTAL</td><td>${fm(total.cuentas)}</td><td>${fmM(total.a_rec)}</td><td>${fmM(total.rec)}</td><td>${pct(total.rec,total.a_rec)}</td><td>${fm(total.pagaron)}</td></tr>
+      </tbody></table></div>
+      <p class="cob-total-note">El total suma las categorías de esta clasificación.</p></section>`
   }
 
   document.getElementById('panel-cobranza').innerHTML = `
     <div class="card">
-      <div class="g4" style="margin-bottom:12px">
-        <div class="tile"><small>A recuperar</small><b>${fmM(d.cob_a_recuperar)}</b></div>
-        <div class="tile"><small>Recuperado</small><b class="ok">${fmM(d.cob_recuperado)}</b></div>
-        <div class="tile"><small>% recupero</small><b>${d.cob_pct!=null?String(d.cob_pct).replace('.',',')+' %':'—'}</b></div>
-        <div class="tile"><small>Fuera universo</small><b>${fmM(d.cob_recibos_fuera)}</b></div>
+      <div class="section-intro">
+        <div><h3 style="margin:0;border:0;padding:0">Gestión de cobranza</h3><p>Recupero del universo incluido en la foto de cobranza ${d.foto_cobranza||''}.</p></div>
       </div>
-      ${cobTable('Por mora al inicio', mora)}
-      ${cobTable('Por estado al inicio', estado)}
-      ${cobTable('Por sucursal', suc)}
+      <div class="g4 campaign-kpis" style="margin-bottom:18px">
+        <div class="tile cost"><small>Total a recuperar</small><b class="cost">${fmM(d.cob_a_recuperar)}</b><em>${fm(d.cob_cuentas_foto)} cuentas en la foto</em></div>
+        <div class="tile good"><small>Total recuperado</small><b class="good">${fmM(d.cob_recuperado)}</b><em>Importe efectivamente cobrado</em></div>
+        <div class="tile activity"><small>Cuentas que pagaron</small><b class="activity">${fm(d.cob_cuentas_pagaron)}</b><em>Clientes con al menos un pago</em></div>
+        <div class="tile good"><small>Porcentaje de recupero</small><b class="good">${d.cob_pct!=null?String(d.cob_pct).replace('.',',')+' %':'—'}</b><em>Recuperado sobre el total a recuperar</em></div>
+      </div>
+      <div class="note" style="margin:0 0 12px">Recibos fuera del universo: <strong>${fmM(d.cob_recibos_fuera)}</strong>.</div>
+      ${cobTable('Detalle por mora al inicio', mora)}
+      ${cobTable('Detalle por estado al inicio', estado)}
+      ${cobTable('Detalle por sucursal', suc)}
       ${dias.length?`
-        <h3>Recuperado acumulado (% sobre a recuperar)</h3>
-        <div class="chart-wrap"><canvas id="chartCob"></canvas></div>
-        <h3>Recuperado por día</h3>
-        <table>
-          <thead><tr><th>Día</th><th>Monto</th></tr></thead>
-          <tbody>${dias.map(r=>`<tr><td>${fd(r.dia)}</td><td>${fmM(r.monto)}</td></tr>`).join('')}</tbody>
-        </table>`:''}
+        <section class="cob-section">
+          <h3>Recupero acumulado</h3>
+          <p class="chart-explain">Evolución del importe recuperado como porcentaje del total a recuperar.</p>
+          <div class="chart-wrap"><canvas id="chartCob"></canvas></div>
+          <h3>Detalle diario de cobranzas</h3>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Día</th><th>Importe recuperado</th></tr></thead>
+            <tbody>${dias.map(r=>`<tr><td>${fd(r.dia)}</td><td>${fmM(r.monto)}</td></tr>`).join('')}
+              <tr class="tot"><td>TOTAL RECUPERADO</td><td>${fmM(dias.reduce((s,r)=>s+(Number(r.monto)||0),0))}</td></tr>
+            </tbody>
+          </table></div>
+        </section>`:''}
     </div>`
 
   if (charts.cob) charts.cob.destroy()
