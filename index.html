@@ -3039,6 +3039,49 @@ function show(el, on) {
 
 
 
+async function refrescarDiario() {
+  const st = document.getElementById('daily-status')
+  const errBox = document.getElementById('daily-error-box')
+  show(errBox, false)
+  st.textContent = 'Actualizando desde Supabase…'
+  
+
+  try {
+    const [r1, r2, r3, r4, r5] = await Promise.all([
+      sb.from('v_informe_resumen').select('*'),
+      sb.from('v_informe_estados').select('*'),
+      sb.from('v_cobranza_resumen').select('*').maybeSingle(),
+      sb.from('v_altas_resumen').select('*').limit(8),
+      sb.from('v_meta_actualizacion').select('*').maybeSingle(),
+    ])
+
+    const errors = [r1, r2, r3, r4, r5].filter(r => r.error).map(r => r.error.message)
+    if (errors.length) throw new Error(errors.join(' | '))
+
+    cache.resumen = r1.data || []
+    cache.estados = r2.data || []
+    cache.cobranza = r3.data
+    cache.altas = r4.data || []
+    cache.meta = r5.data
+
+    renderAll()
+    const m = cache.meta
+    st.textContent = 'Actualizado ' + new Date().toLocaleString('es-AR')
+    document.getElementById('meta-line').textContent = m
+      ? `Período actual: ${fm(m.filas_periodo_actual)} cuentas · Inicio: ${fm(m.filas_periodo_inicio)} · ` +
+        `Clientes: ${fm(m.filas_clientebase)} · Últ. compra: ${m.max_fechacompra || '—'} · ` +
+        `Últ. recibo: ${m.max_fecharecibo || '—'}`
+      : '—'
+  } catch (e) {
+    errBox.textContent = 'Error al consultar: ' + e.message
+    show(errBox, true)
+    st.textContent = 'Error al actualizar'
+  } finally {
+    
+  }
+}
+
+
 function renderDiarioAll() {
   renderResumenDiario()
   renderEstadosDiario()
