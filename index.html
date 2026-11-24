@@ -477,8 +477,7 @@ document.getElementById('btn-refresh').onclick = ()=> { load(); refrescarDiario(
 
 function activatePanel(view, updateUrl=true){
   const buttons=[...document.querySelectorAll('#tabs button')];
-  const valid=buttons.some(b=>b.dataset.p===view);
-  const selected=valid?view:'conclusiones';
+  const selected=buttons.some(b=>b.dataset.p===view)?view:'conclusiones';
   buttons.forEach(b=>b.classList.toggle('on',b.dataset.p===selected));
   document.querySelectorAll('#app-view .panel').forEach(p=>p.classList.toggle('on',p.id==='panel-'+selected));
   if(updateUrl){
@@ -487,28 +486,19 @@ function activatePanel(view, updateUrl=true){
     else u.searchParams.set('vista',selected);
     window.history.replaceState({},'',u);
   }
-  return selected;
 }
-document.querySelectorAll('#tabs button').forEach(b=>{
-  b.onclick=()=>activatePanel(b.dataset.p,true);
-});
+document.querySelectorAll('#tabs button').forEach(b=>{b.onclick=()=>activatePanel(b.dataset.p,true)});
 activatePanel(new URLSearchParams(window.location.search).get('vista')||'conclusiones',false);
-
 document.getElementById('btn-share').onclick=async()=>{
   const url=window.location.href;
   try{
     if(navigator.clipboard && navigator.clipboard.writeText){
       await navigator.clipboard.writeText(url);
-      const btn=document.getElementById('btn-share');
-      const label=btn.textContent;
+      const btn=document.getElementById('btn-share'), label=btn.textContent;
       btn.textContent='¡Link copiado!';
       setTimeout(()=>btn.textContent=label,1800);
-    }else{
-      window.prompt('Copiá este enlace para compartir la vista:',url);
-    }
-  }catch(e){
-    window.prompt('Copiá este enlace para compartir la vista:',url);
-  }
+    }else window.prompt('Copiá este enlace para compartir la vista:',url);
+  }catch(e){window.prompt('Copiá este enlace para compartir la vista:',url)}
 }
 
 async function load(){
@@ -3014,7 +3004,6 @@ function renderCampanas(){
   pintar()
 }
 
-
 const NE = { A: 'ACTIVA', F: 'ACTIVO-FIN.', M: 'MORA', B: 'BAJA', '?': '?' }
 let dailyCache = {
   resumen: [],
@@ -3038,7 +3027,6 @@ function show(el, on) {
 }
 
 
-
 async function refrescarDiario() {
   const st = document.getElementById('daily-status')
   const errBox = document.getElementById('daily-error-box')
@@ -3058,14 +3046,14 @@ async function refrescarDiario() {
     const errors = [r1, r2, r3, r4, r5].filter(r => r.error).map(r => r.error.message)
     if (errors.length) throw new Error(errors.join(' | '))
 
-    cache.resumen = r1.data || []
-    cache.estados = r2.data || []
-    cache.cobranza = r3.data
-    cache.altas = r4.data || []
-    cache.meta = r5.data
+    dailyCache.resumen = r1.data || []
+    dailyCache.estados = r2.data || []
+    dailyCache.cobranza = r3.data
+    dailyCache.altas = r4.data || []
+    dailyCache.meta = r5.data
 
-    renderAll()
-    const m = cache.meta
+    renderDiarioAll()
+    const m = dailyCache.meta
     st.textContent = 'Actualizado ' + new Date().toLocaleString('es-AR')
     document.getElementById('meta-line').textContent = m
       ? `Período actual: ${fm(m.filas_periodo_actual)} cuentas · Inicio: ${fm(m.filas_periodo_inicio)} · ` +
@@ -3210,7 +3198,6 @@ function renderAltasDiario() {
 }
 
 
-
 document.querySelectorAll('#seg-btns button').forEach(b=>{
   b.onclick=()=>{
     document.querySelectorAll('#seg-btns button').forEach(x=>x.classList.remove('on'));
@@ -3221,7 +3208,6 @@ document.querySelectorAll('#seg-btns button').forEach(b=>{
     renderMoraDiario();
   };
 });
-
 initAuth()
 
 
