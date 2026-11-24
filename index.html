@@ -531,12 +531,13 @@ function showLogin(){
   show(document.getElementById('app-view'),false)
 }
 
-function enter(){
+async function enter(){
   show(document.getElementById('login-view'),false)
   show(document.getElementById('app-view'),true)
-  load()
-  refrescarDiario()
-  refrescarActividadSegmentada()
+  // Evitar saturar Supabase: ejecutar cada bloque pesado en secuencia.
+  await load()
+  await refrescarDiario()
+  await refrescarActividadSegmentada()
 }
 
 document.getElementById('btn-login').onclick = async ()=>{
@@ -562,7 +563,17 @@ document.getElementById('btn-login').onclick = async ()=>{
 }
 
 document.getElementById('btn-logout').onclick = ()=> sb.auth.signOut()
-document.getElementById('btn-refresh').onclick = ()=> { load(); refrescarDiario(); refrescarActividadSegmentada(); }
+document.getElementById('btn-refresh').onclick = async ()=> {
+  const btn = document.getElementById('btn-refresh')
+  btn.disabled = true
+  try {
+    await load()
+    await refrescarDiario()
+    await refrescarActividadSegmentada()
+  } finally {
+    btn.disabled = false
+  }
+}
 
 function activatePanel(view, updateUrl=true){
   const buttons=[...document.querySelectorAll('#tabs button')];
@@ -1840,15 +1851,18 @@ async function refrescarDiario() {
     new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado (65 s)')), 65000))
   ])
 
-  const resultados = await Promise.all(consultas.map(async ([nombre, fn]) => {
+  // Consultas secuenciales: estas vistas recorren tablas grandes.
+  // Ejecutarlas en paralelo junto con KPIs e inteligencia provocaba 500 por saturación.
+  const resultados = []
+  for (const [nombre, fn] of consultas) {
     try {
       const r = await conLimite(fn)
-      if (r.error) return { nombre, error: r.error.message }
-      return { nombre, data: r.data }
+      if (r.error) resultados.push({ nombre, error: r.error.message })
+      else resultados.push({ nombre, data: r.data })
     } catch (e) {
-      return { nombre, error: e && e.message ? e.message : String(e) }
+      resultados.push({ nombre, error: e && e.message ? e.message : String(e) })
     }
-  }))
+  }
 
   const errores = resultados.filter(x => x.error)
   const datos = resultados.filter(x => !x.error)
