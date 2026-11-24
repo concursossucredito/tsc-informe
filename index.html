@@ -1752,41 +1752,58 @@ async function refrescarDiario() {
   const errBox = document.getElementById('daily-error-box')
   show(errBox, false)
   st.textContent = 'Actualizando indicadores de cartera desde Supabase…'
-  
 
-  try {
-    const [r1, r2, r3, r4, r5] = await Promise.all([
-      sb.from('v_informe_resumen').select('*'),
-      sb.from('v_informe_estados').select('*'),
-      sb.from('v_cobranza_resumen').select('*').maybeSingle(),
-      sb.from('v_altas_resumen').select('*').limit(8),
-      sb.from('v_meta_actualizacion').select('*').maybeSingle(),
-    ])
+  const consultas = [
+    ['Resumen de cartera', () => sb.from('v_informe_resumen').select('*')],
+    ['Movimiento de estados', () => sb.from('v_informe_estados').select('*')],
+    ['Gestión de cobranza', () => sb.from('v_cobranza_resumen').select('*').maybeSingle()],
+    ['Activación de nuevas cuentas', () => sb.from('v_altas_resumen').select('*').limit(8)],
+    ['Metadatos de actualización', () => sb.from('v_meta_actualizacion').select('*').maybeSingle()]
+  ]
 
-    const errors = [r1, r2, r3, r4, r5].filter(r => r.error).map(r => r.error.message)
-    if (errors.length) throw new Error(errors.join(' | '))
+  // Cada consulta tiene un límite propio: una vista lenta no debe bloquear
+  // todos los indicadores ni dejar las tablas vacías indefinidamente.
+  const conLimite = (fn) => Promise.race([
+    fn(),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado (15 s)')), 15000))
+  ])
 
-    dailyCache.resumen = r1.data || []
-    dailyCache.estados = r2.data || []
-    dailyCache.cobranza = r3.data
-    dailyCache.altas = r4.data || []
-    dailyCache.meta = r5.data
+  const resultados = await Promise.all(consultas.map(async ([nombre, fn]) => {
+    try {
+      const r = await conLimite(fn)
+      if (r.error) return { nombre, error: r.error.message }
+      return { nombre, data: r.data }
+    } catch (e) {
+      return { nombre, error: e && e.message ? e.message : String(e) }
+    }
+  }))
 
-    renderDiarioAll()
-    const m = dailyCache.meta
-    st.textContent = 'Datos actualizados ' + new Date().toLocaleString('es-AR')
-    document.getElementById('meta-line').textContent = m
-      ? `Período actual: ${fm(m.filas_periodo_actual)} cuentas · Inicio: ${fm(m.filas_periodo_inicio)} · ` +
-        `Clientes: ${fm(m.filas_clientebase)} · Últ. compra: ${m.max_fechacompra || '—'} · ` +
-        `Últ. recibo: ${m.max_fecharecibo || '—'}`
-      : '—'
-  } catch (e) {
-    errBox.textContent = 'Error al consultar: ' + e.message
+  const errores = resultados.filter(x => x.error)
+  const datos = resultados.filter(x => !x.error)
+
+  // Guardar cada resultado por separado para poder mostrar lo que sí respondió.
+  dailyCache.resumen = datos.find(x => x.nombre === 'Resumen de cartera')?.data || []
+  dailyCache.estados = datos.find(x => x.nombre === 'Movimiento de estados')?.data || []
+  dailyCache.cobranza = datos.find(x => x.nombre === 'Gestión de cobranza')?.data || null
+  dailyCache.altas = datos.find(x => x.nombre === 'Activación de nuevas cuentas')?.data || []
+  dailyCache.meta = datos.find(x => x.nombre === 'Metadatos de actualización')?.data || null
+
+  renderDiarioAll()
+
+  if (errores.length) {
+    errBox.textContent = 'Carga parcial. ' + errores.map(x => x.nombre + ': ' + x.error).join(' · ')
     show(errBox, true)
-    st.textContent = 'Error al actualizar los indicadores'
-  } finally {
-    
+    st.textContent = 'Indicadores cargados parcialmente · Revisar detalle del error'
+  } else {
+    st.textContent = 'Datos actualizados ' + new Date().toLocaleString('es-AR')
   }
+
+  const m = dailyCache.meta
+  document.getElementById('meta-line').textContent = m
+    ? `Período actual: ${fm(m.filas_periodo_actual)} cuentas · Inicio: ${fm(m.filas_periodo_inicio)} · ` +
+      `Clientes: ${fm(m.filas_clientebase)} · Últ. compra: ${m.max_fechacompra || '—'} · ` +
+      `Últ. recibo: ${m.max_fecharecibo || '—'}`
+    : 'Metadatos no disponibles'
 }
 
 
