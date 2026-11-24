@@ -300,22 +300,6 @@ tbody tr:hover td { background:#fafbfc; }
 
 
 /* Inteligencia de cartera */
-.intel-commercial { margin: 18px 0 26px; }
-.intel-segment-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(175px,1fr)); gap:10px; margin:12px 0; }
-.intel-segment-card { background:#fff; border:1px solid var(--bd); border-radius:12px; padding:13px 14px; }
-.intel-segment-card small { display:block; color:var(--mu); font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
-.intel-segment-card b { display:block; margin:5px 0 2px; font-size:22px; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
-.intel-segment-card span { color:var(--mu); font-size:11px; }
-.intel-commercial .card { margin-top:12px; }
-.intel-commercial .tbl-wrap { max-height:420px; }
-.intel-commercial table { min-width:950px; }
-.intel-commercial-insights { margin-top:12px; }
-@media(max-width:650px) {
-  .intel-segment-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .intel-segment-card { padding:11px; }
-  .intel-segment-card b { font-size:19px; }
-}
-/* Inteligencia de cartera */
 .intel-heading { margin:22px 0 10px; font-size:16px; letter-spacing:-.02em; }
 .intel-sub { color:var(--mu); font-size:12px; margin:-4px 0 12px; }
 .intel-card { background:#fff; border:1px solid var(--bd); border-radius:14px; padding:16px; box-shadow:0 3px 14px rgba(30,42,56,.045); }
@@ -354,7 +338,7 @@ tbody tr:hover td { background:#fafbfc; }
     <div class="brand">
       <div class="mark">TSC</div>
       <div>
-        <h1>Inteligencia de cartera</h1>
+        <h1>Informe de cartera</h1>
         <div id="subtitle">—</div>
       </div>
     </div>
@@ -373,7 +357,7 @@ tbody tr:hover td { background:#fafbfc; }
     <button type="button" data-p="altas">Altas</button>
     <button type="button" data-p="cobranza">Cobranza</button>
     <button type="button" data-p="campanas">Campañas</button>
-    <button type="button" data-p="inteligencia">Inteligencia de cartera</button>
+    <button type="button" data-p="inteligencia">Indicadores</button>
   </nav>
   <main>
     <div id="error-box" class="hidden"></div>
@@ -389,64 +373,10 @@ tbody tr:hover td { background:#fafbfc; }
   
     <div id="panel-inteligencia" class="panel">
       <div class="card">
-        <h2 style="margin-top:0">Inteligencia de cartera</h2>
+        <h2 style="margin-top:0">Indicadores de cartera</h2>
         <div id="daily-status" class="note">Sin datos</div>
         <p class="note" id="meta-line">—</p>
       </div>
-
-      <section class="intel-commercial">
-        <div class="section-intro">
-          <div>
-            <h2 style="margin:0">Actividad comercial y financiera</h2>
-            <p>Consumo comercial por grupo de clientes. Los préstamos otorgados se muestran por separado.</p>
-          </div>
-          <span id="intel-commercial-status" class="note">Consultando datos…</span>
-        </div>
-        <div id="intel-segment-cards" class="intel-segment-grid"></div>
-        <div class="card">
-          <h3>Detalle de actividad por grupo</h3>
-          <div class="tbl-wrap">
-            <table id="tbl-intel-segment">
-              <thead><tr>
-                <th>Grupo</th><th>Base de cálculo</th><th>Con compras</th><th>% consumo</th>
-                <th>Cupones</th><th>Importe compras</th>
-              </tr></thead>
-              <tbody><tr><td colspan="6">Esperando datos…</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <h3>Origen de otros clientes base</h3>
-          <p class="note">Desglose de las cuentas que están en w_clientebase y no pertenecen a Cartera, PI, Inactivos ni altas del período actual. Las altas anteriores se muestran como subconjunto identificado.</p>
-          <div class="tbl-wrap">
-            <table id="tbl-intel-otros">
-              <thead><tr><th>Origen</th><th>Cuentas</th><th>Detalle</th></tr></thead>
-              <tbody><tr><td colspan="3">Esperando datos…</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <h3>Evolución intermensual de compras</h3>
-          <p class="note">Cada cupón corresponde a una operación registrada en w_compras. La variación compara cada mes con el mes anterior.</p>
-          <div class="tbl-wrap">
-            <table id="tbl-intel-monthly">
-              <thead><tr><th>Período</th><th>Cupones</th><th>Var. cupones</th><th>Importe</th><th>Var. importe</th></tr></thead>
-              <tbody><tr><td colspan="5">Esperando datos…</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <h3>Préstamos otorgados · indicador independiente</h3>
-          <p class="note">No se asignan a segmentos porque esta fuente no está vinculada con esos universos. La variación compara cada período con el anterior; 12-2026 es parcial (iniciado el 24/11).</p>
-          <div class="tbl-wrap">
-            <table id="tbl-intel-loans">
-              <thead><tr><th>Período</th><th>Clientes</th><th>Var. clientes</th><th>Operaciones</th><th>Var. operaciones</th><th>Importe otorgado</th><th>Var. importe</th><th>Total financiado</th><th>Var. financiado</th><th>Desde</th><th>Hasta</th></tr></thead>
-              <tbody><tr><td colspan="11">Esperando datos…</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-        <div id="intel-commercial-insights" class="insight-grid"></div>
-      </section>
 
       <h2>Indicadores de cartera</h2>
       <div class="seg" id="seg-btns">
@@ -537,7 +467,6 @@ async function enter(){
   // Evitar saturar Supabase: ejecutar cada bloque pesado en secuencia.
   await load()
   await refrescarDiario()
-  await refrescarActividadSegmentada()
 }
 
 document.getElementById('btn-login').onclick = async ()=>{
@@ -569,7 +498,6 @@ document.getElementById('btn-refresh').onclick = async ()=> {
   try {
     await load()
     await refrescarDiario()
-    await refrescarActividadSegmentada()
   } finally {
     btn.disabled = false
   }
@@ -1927,158 +1855,6 @@ function renderInteligenciaInsights() {
     {tone:'info',title:'Activación de altas',value:altas?(altas.pct_uso==null?'Sin dato':String(altas.pct_uso).replace('.',',')+' %'):'Sin datos',body:altas?`En el período de venta ${altas.periodoventa||'más reciente'} ingresaron ${fm(altas.altas)} cuentas; ${fm(altas.con_uso)} registran uso.`:'Todavía no hay períodos de altas disponibles para analizar.'}
   ]
   host.innerHTML = cards.map(x=>`<article class="intel-card ${x.tone}"><h3>${x.title}</h3><p><strong>${x.value}</strong><br>${x.body}</p></article>`).join('')
-}
-
-let actividadSegmentadaCache = null
-
-async function refrescarActividadSegmentada() {
-  const status = document.getElementById('intel-commercial-status')
-  if (status) status.textContent = 'Actualizando actividad…'
-  const { data, error } = await sb.rpc('obtener_inteligencia_cartera')
-  if (error) {
-    if (status) status.textContent = 'No se pudo consultar la actividad: ' + error.message
-    renderActividadSegmentada(null)
-    return
-  }
-  actividadSegmentadaCache = data
-  renderActividadSegmentada(data)
-  if (status) status.textContent = 'Actualizado ' + new Date().toLocaleString('es-AR')
-}
-
-function renderActividadSegmentada(data) {
-  const cards = document.getElementById('intel-segment-cards')
-  const body = document.querySelector('#tbl-intel-segment tbody')
-  const loansBody = document.querySelector('#tbl-intel-loans tbody')
-  const othersBody = document.querySelector('#tbl-intel-otros tbody')
-  const monthlyBody = document.querySelector('#tbl-intel-monthly tbody')
-  const insights = document.getElementById('intel-commercial-insights')
-  if (!cards || !body || !loansBody || !insights) return
-
-  if (!data || !Array.isArray(data.grupos)) {
-    cards.innerHTML = ''
-    body.innerHTML = '<tr><td colspan="6">No hay datos disponibles. Revisá la función de consulta en Supabase.</td></tr>'
-    loansBody.innerHTML = '<tr><td colspan="7">Sin datos</td></tr>'
-    if (othersBody) othersBody.innerHTML = '<tr><td colspan="3">Sin datos</td></tr>'
-    if (monthlyBody) monthlyBody.innerHTML = '<tr><td colspan="5">Sin datos</td></tr>'
-    insights.innerHTML = ''
-    return
-  }
-
-  const rows = data.grupos
-  const order = ['CARTERA','PI','INACTIVO','ALTA_12_26','OTRO_CLIENTE_BASE']
-  rows.sort((a,b) => order.indexOf(a.grupo)-order.indexOf(b.grupo))
-  const num = v => Number(v) || 0
-  const labels = {
-    CARTERA:'Cartera',
-    PI:'Posibles inactivos (PI)',
-    INACTIVO:'Inactivos',
-    ALTA_12_26:'Altas 12-26',
-    OTRO_CLIENTE_BASE:'Otros clientes base'
-  }
-  const pi = data.pi_potencial || {}
-  const piBase = num(pi.pi_activas)
-  const piUsed = num(pi.pi_activas_que_consumieron)
-  const piPct = pi.porcentaje_consumo == null
-    ? (piBase ? 100*piUsed/piBase : null)
-    : num(pi.porcentaje_consumo)
-
-  const baseFor = r => r.grupo === 'PI' ? piBase : num(r.total_clientes)
-  const usedFor = r => r.grupo === 'PI' ? piUsed : num(r.clientes_con_compras)
-  const penetration = r => baseFor(r) ? 100*usedFor(r)/baseFor(r) : 0
-
-  cards.innerHTML = rows.map(r => {
-    const base = baseFor(r)
-    const used = usedFor(r)
-    const extra = r.grupo === 'PI'
-      ? `${fm(base)} activas de ${fm(r.total_clientes)} PI · base potencial`
-      : `${fm(base)} cuentas · ${penetration(r).toFixed(1).replace('.',',')} % de uso`
-    return `<article class="intel-segment-card">
-      <small>${labels[r.grupo] || r.grupo}</small>
-      <b>${fm(used)} <span>con compras</span></b>
-      <span>${extra}</span>
-    </article>`
-  }).join('')
-
-  body.innerHTML = rows.map(r => {
-    const base = baseFor(r)
-    const used = usedFor(r)
-    return `<tr>
-      <td>${labels[r.grupo] || r.grupo}</td>
-      <td>${fm(base)}</td>
-      <td>${fm(used)}</td>
-      <td>${base ? penetration(r).toFixed(1).replace('.',',')+' %' : '—'}</td>
-      <td>${r.grupo === 'PI' ? '—' : fm(r.operaciones_compra)}</td>
-      <td>${r.grupo === 'PI' ? '—' : fmM(r.importe_compras)}</td>
-    </tr>`
-  }).join('') || '<tr><td colspan="6">Sin datos</td></tr>'
-
-  const otros = data.otros_origen || null
-  if (othersBody) {
-    othersBody.innerHTML = otros
-      ? `<tr><td>Clientebase · total Otros</td><td>${fm(otros.clientebase_total)}</td><td>Universo de w_clientebase fuera de los grupos clasificados</td></tr>
-         <tr><td>Altas de períodos anteriores</td><td>${fm(otros.altas_anteriores_dentro)}</td><td>Incluidas dentro del total de Otros clientes base</td></tr>
-         <tr><td>Solo clientebase</td><td>${fm(otros.solo_clientebase)}</td><td>Otros sin coincidencia en altas anteriores</td></tr>`
-      : '<tr><td colspan="3">Pendiente de incorporar el desglose de altas anteriores en la función de Supabase</td></tr>'
-  }
-
-  const monthly = Array.isArray(data.compras_mensuales) ? data.compras_mensuales : []
-  if (monthlyBody) {
-    monthlyBody.innerHTML = monthly.map((r,i) => {
-      const prev = i > 0 ? monthly[i-1] : null
-      const delta = (v,p) => {
-        if (!p || num(p) === 0) return '—'
-        const d = 100*(num(v)-num(p))/num(p)
-        return (d > 0 ? '+' : '') + d.toFixed(1).replace('.',',') + ' %'
-      }
-      return `<tr>
-        <td>${r.periodo || '—'}</td>
-        <td>${fm(r.cupones)}</td>
-        <td>${prev ? delta(r.cupones,prev.cupones) : '—'}</td>
-        <td>${fmM(r.importe)}</td>
-        <td>${prev ? delta(r.importe,prev.importe) : '—'}</td>
-      </tr>`
-    }).join('') || '<tr><td colspan="5">Sin datos mensuales</td></tr>'
-  }
-
-  const loans = Array.isArray(data.prestamos) ? [...data.prestamos] : []
-  const periodKey = value => {
-    const m = String(value || '').match(/^(\d{1,2})-(\d{4})$/)
-    return m ? Number(m[2]) * 100 + Number(m[1]) : 0
-  }
-  loans.sort((a,b) => periodKey(a.periodo) - periodKey(b.periodo))
-  const loanDelta = (value, previous) => {
-    const current = num(value), prior = num(previous)
-    if (previous == null || prior === 0) return '—'
-    const pct = 100 * (current - prior) / prior
-    return (pct > 0 ? '+' : '') + pct.toFixed(1).replace('.', ',') + ' %'
-  }
-  loansBody.innerHTML = loans.map((r,i) => {
-    const prev = i > 0 ? loans[i-1] : null
-    return `<tr>
-      <td>${r.periodo || '—'}</td>
-      <td>${fm(r.clientes)}</td>
-      <td>${prev ? loanDelta(r.clientes, prev.clientes) : '—'}</td>
-      <td>${fm(r.operaciones)}</td>
-      <td>${prev ? loanDelta(r.operaciones, prev.operaciones) : '—'}</td>
-      <td>${fmM(r.importe_otorgado)}</td>
-      <td>${prev ? loanDelta(r.importe_otorgado, prev.importe_otorgado) : '—'}</td>
-      <td>${fmM(r.total_financiado)}</td>
-      <td>${prev ? loanDelta(r.total_financiado, prev.total_financiado) : '—'}</td>
-      <td>${fd(r.primera_fecha)}</td>
-      <td>${fd(r.ultima_fecha)}</td>
-    </tr>`
-  }).join('') || '<tr><td colspan="11">Sin préstamos registrados</td></tr>'
-
-  const byGroup = Object.fromEntries(rows.map(r => [r.grupo,r]))
-  const cartera = byGroup.CARTERA || {}, piGroup = byGroup.PI || {}, inactivos = byGroup.INACTIVO || {}, otrosGroup = byGroup.OTRO_CLIENTE_BASE || {}
-  const groupPenetration = r => num(r.total_clientes) ? 100*num(r.clientes_con_compras)/num(r.total_clientes) : 0
-  const gap = groupPenetration(cartera)-penetration(piGroup)
-  const insightCards = [
-    {tone:'info',title:'Brecha de consumo entre Cartera y PI activa',value:gap.toFixed(1).replace('.',',')+' puntos',body:`Cartera registra ${groupPenetration(cartera).toFixed(1).replace('.',',')} % de clientes con compras frente a ${(piPct == null ? 0 : piPct).toFixed(1).replace('.',',')} % de PI activas.`},
-    {tone:'warn',title:'Inactivos con compras',value:fm(inactivos.clientes_con_compras),body:'Cuentas clasificadas como Inactivos que registraron compras. Es una señal de actividad, no una confirmación de emisión futura.'},
-    {tone:'neutral',title:'Otros clientes base con compras',value:fm(otrosGroup.clientes_con_compras),body:'Cuentas de w_clientebase fuera de los grupos clasificados. El desglose de altas anteriores se presenta por separado.'}
-  ]
-  insights.innerHTML = insightCards.map(x => `<article class="intel-card ${x.tone}"><h3>${x.title}</h3><p><strong>${x.value}</strong><br>${x.body}</p></article>`).join('')
 }
 
 function rowResumenDiario(s) {
