@@ -398,7 +398,7 @@ tbody tr:hover td { background:#fafbfc; }
         <div class="section-intro">
           <div>
             <h2 style="margin:0">Actividad comercial y financiera</h2>
-            <p>Compras y débitos por grupo de clientes. Los préstamos otorgados se muestran por separado.</p>
+            <p>Consumo comercial por grupo de clientes. Los préstamos otorgados se muestran por separado.</p>
           </div>
           <span id="intel-commercial-status" class="note">Consultando datos…</span>
         </div>
@@ -408,12 +408,30 @@ tbody tr:hover td { background:#fafbfc; }
           <div class="tbl-wrap">
             <table id="tbl-intel-segment">
               <thead><tr>
-                <th>Grupo</th><th>Clientes</th><th>Con compras</th><th>% uso</th>
-                <th>Operaciones</th><th>Importe compras</th>
-                <th>Débito préstamos</th><th>Importe</th>
-                <th>Débito servicios</th><th>Importe</th>
+                <th>Grupo</th><th>Base de cálculo</th><th>Con compras</th><th>% consumo</th>
+                <th>Cupones</th><th>Importe compras</th>
               </tr></thead>
-              <tbody><tr><td colspan="10">Esperando datos…</td></tr></tbody>
+              <tbody><tr><td colspan="6">Esperando datos…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Origen de otros clientes base</h3>
+          <p class="note">Desglose de las cuentas que están en w_clientebase y no pertenecen a Cartera, PI, Inactivos ni altas del período actual. Las altas anteriores se muestran como subconjunto identificado.</p>
+          <div class="tbl-wrap">
+            <table id="tbl-intel-otros">
+              <thead><tr><th>Origen</th><th>Cuentas</th><th>Detalle</th></tr></thead>
+              <tbody><tr><td colspan="3">Esperando datos…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Evolución intermensual de compras</h3>
+          <p class="note">Cada cupón corresponde a una operación registrada en w_compras. La variación compara cada mes con el mes anterior.</p>
+          <div class="tbl-wrap">
+            <table id="tbl-intel-monthly">
+              <thead><tr><th>Período</th><th>Cupones</th><th>Var. cupones</th><th>Importe</th><th>Var. importe</th></tr></thead>
+              <tbody><tr><td colspan="5">Esperando datos…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1819,7 +1837,7 @@ async function refrescarDiario() {
   // todos los indicadores ni dejar las tablas vacías indefinidamente.
   const conLimite = (fn) => Promise.race([
     fn(),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado (15 s)')), 15000))
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado (65 s)')), 65000))
   ])
 
   const resultados = await Promise.all(consultas.map(async ([nombre, fn]) => {
@@ -1917,13 +1935,17 @@ function renderActividadSegmentada(data) {
   const cards = document.getElementById('intel-segment-cards')
   const body = document.querySelector('#tbl-intel-segment tbody')
   const loansBody = document.querySelector('#tbl-intel-loans tbody')
+  const othersBody = document.querySelector('#tbl-intel-otros tbody')
+  const monthlyBody = document.querySelector('#tbl-intel-monthly tbody')
   const insights = document.getElementById('intel-commercial-insights')
   if (!cards || !body || !loansBody || !insights) return
 
   if (!data || !Array.isArray(data.grupos)) {
     cards.innerHTML = ''
-    body.innerHTML = '<tr><td colspan="10">No hay datos disponibles. Revisá la función de consulta en Supabase.</td></tr>'
+    body.innerHTML = '<tr><td colspan="6">No hay datos disponibles. Revisá la función de consulta en Supabase.</td></tr>'
     loansBody.innerHTML = '<tr><td colspan="7">Sin datos</td></tr>'
+    if (othersBody) othersBody.innerHTML = '<tr><td colspan="3">Sin datos</td></tr>'
+    if (monthlyBody) monthlyBody.innerHTML = '<tr><td colspan="5">Sin datos</td></tr>'
     insights.innerHTML = ''
     return
   }
@@ -1939,30 +1961,70 @@ function renderActividadSegmentada(data) {
     ALTA_12_26:'Altas 12-26',
     OTRO_CLIENTE_BASE:'Otros clientes base'
   }
+  const pi = data.pi_potencial || {}
+  const piBase = num(pi.pi_activas)
+  const piUsed = num(pi.pi_activas_que_consumieron)
+  const piPct = pi.porcentaje_consumo == null
+    ? (piBase ? 100*piUsed/piBase : null)
+    : num(pi.porcentaje_consumo)
+
+  const baseFor = r => r.grupo === 'PI' ? piBase : num(r.total_clientes)
+  const usedFor = r => r.grupo === 'PI' ? piUsed : num(r.clientes_con_compras)
+  const penetration = r => baseFor(r) ? 100*usedFor(r)/baseFor(r) : 0
+
   cards.innerHTML = rows.map(r => {
-    const penetration = num(r.total_clientes) ? 100*num(r.clientes_con_compras)/num(r.total_clientes) : 0
+    const base = baseFor(r)
+    const used = usedFor(r)
+    const extra = r.grupo === 'PI'
+      ? `${fm(base)} activas de ${fm(r.total_clientes)} PI · base potencial`
+      : `${fm(base)} cuentas · ${penetration(r).toFixed(1).replace('.',',')} % de uso`
     return `<article class="intel-segment-card">
       <small>${labels[r.grupo] || r.grupo}</small>
-      <b>${fm(r.clientes_con_compras)} <span>con compras</span></b>
-      <span>${fm(r.total_clientes)} cuentas · ${penetration.toFixed(1).replace('.',',')} % de uso</span>
+      <b>${fm(used)} <span>con compras</span></b>
+      <span>${extra}</span>
     </article>`
   }).join('')
 
   body.innerHTML = rows.map(r => {
-    const penetration = num(r.total_clientes) ? 100*num(r.clientes_con_compras)/num(r.total_clientes) : 0
+    const base = baseFor(r)
+    const used = usedFor(r)
     return `<tr>
       <td>${labels[r.grupo] || r.grupo}</td>
-      <td>${fm(r.total_clientes)}</td>
-      <td>${fm(r.clientes_con_compras)}</td>
-      <td>${penetration.toFixed(1).replace('.',',')} %</td>
-      <td>${fm(r.operaciones_compra)}</td>
-      <td>${fmM(r.importe_compras)}</td>
-      <td>${fm(r.clientes_con_debito_prestamo)}</td>
-      <td>${fmM(r.importe_debito_prestamo)}</td>
-      <td>${fm(r.clientes_con_debito_servicios)}</td>
-      <td>${fmM(r.importe_debito_servicios)}</td>
+      <td>${fm(base)}</td>
+      <td>${fm(used)}</td>
+      <td>${base ? penetration(r).toFixed(1).replace('.',',')+' %' : '—'}</td>
+      <td>${r.grupo === 'PI' ? '—' : fm(r.operaciones_compra)}</td>
+      <td>${r.grupo === 'PI' ? '—' : fmM(r.importe_compras)}</td>
     </tr>`
-  }).join('') || '<tr><td colspan="10">Sin datos</td></tr>'
+  }).join('') || '<tr><td colspan="6">Sin datos</td></tr>'
+
+  const otros = data.otros_origen || null
+  if (othersBody) {
+    othersBody.innerHTML = otros
+      ? `<tr><td>Clientebase · total Otros</td><td>${fm(otros.clientebase_total)}</td><td>Universo de w_clientebase fuera de los grupos clasificados</td></tr>
+         <tr><td>Altas de períodos anteriores</td><td>${fm(otros.altas_anteriores_dentro)}</td><td>Incluidas dentro del total de Otros clientes base</td></tr>
+         <tr><td>Solo clientebase</td><td>${fm(otros.solo_clientebase)}</td><td>Otros sin coincidencia en altas anteriores</td></tr>`
+      : '<tr><td colspan="3">Pendiente de incorporar el desglose de altas anteriores en la función de Supabase</td></tr>'
+  }
+
+  const monthly = Array.isArray(data.compras_mensuales) ? data.compras_mensuales : []
+  if (monthlyBody) {
+    monthlyBody.innerHTML = monthly.map((r,i) => {
+      const prev = i > 0 ? monthly[i-1] : null
+      const delta = (v,p) => {
+        if (!p || num(p) === 0) return '—'
+        const d = 100*(num(v)-num(p))/num(p)
+        return (d > 0 ? '+' : '') + d.toFixed(1).replace('.',',') + ' %'
+      }
+      return `<tr>
+        <td>${r.periodo || '—'}</td>
+        <td>${fm(r.cupones)}</td>
+        <td>${prev ? delta(r.cupones,prev.cupones) : '—'}</td>
+        <td>${fmM(r.importe)}</td>
+        <td>${prev ? delta(r.importe,prev.importe) : '—'}</td>
+      </tr>`
+    }).join('') || '<tr><td colspan="5">Sin datos mensuales</td></tr>'
+  }
 
   const loans = Array.isArray(data.prestamos) ? data.prestamos : []
   loansBody.innerHTML = loans.map(r => `<tr>
@@ -1976,13 +2038,13 @@ function renderActividadSegmentada(data) {
   </tr>`).join('') || '<tr><td colspan="7">Sin préstamos registrados</td></tr>'
 
   const byGroup = Object.fromEntries(rows.map(r => [r.grupo,r]))
-  const cartera = byGroup.CARTERA || {}, pi = byGroup.PI || {}, inactivos = byGroup.INACTIVO || {}, otros = byGroup.OTRO_CLIENTE_BASE || {}
-  const penetration = r => num(r.total_clientes) ? 100*num(r.clientes_con_compras)/num(r.total_clientes) : 0
-  const gap = penetration(cartera)-penetration(pi)
+  const cartera = byGroup.CARTERA || {}, piGroup = byGroup.PI || {}, inactivos = byGroup.INACTIVO || {}, otrosGroup = byGroup.OTRO_CLIENTE_BASE || {}
+  const groupPenetration = r => num(r.total_clientes) ? 100*num(r.clientes_con_compras)/num(r.total_clientes) : 0
+  const gap = groupPenetration(cartera)-penetration(piGroup)
   const insightCards = [
-    {tone:'info',title:'Brecha de consumo entre Cartera y PI',value:gap.toFixed(1).replace('.',',')+' puntos',body:`Cartera registra ${penetration(cartera).toFixed(1).replace('.',',')} % de clientes con compras frente a ${penetration(pi).toFixed(1).replace('.',',')} % en PI.`},
-    {tone:'warn',title:'Inactivos con compras',value:fm(inactivos.clientes_con_compras),body:'Cuentas clasificadas como Inactivos que registraron compras en las tablas actuales. Es una señal de actividad, no una confirmación de emisión futura.'},
-    {tone:'neutral',title:'Otros clientes base con compras',value:fm(otros.clientes_con_compras),body:'Se mantienen como población independiente. No se consideran reactivados sin validar su historia previa.'}
+    {tone:'info',title:'Brecha de consumo entre Cartera y PI activa',value:gap.toFixed(1).replace('.',',')+' puntos',body:`Cartera registra ${groupPenetration(cartera).toFixed(1).replace('.',',')} % de clientes con compras frente a ${(piPct == null ? 0 : piPct).toFixed(1).replace('.',',')} % de PI activas.`},
+    {tone:'warn',title:'Inactivos con compras',value:fm(inactivos.clientes_con_compras),body:'Cuentas clasificadas como Inactivos que registraron compras. Es una señal de actividad, no una confirmación de emisión futura.'},
+    {tone:'neutral',title:'Otros clientes base con compras',value:fm(otrosGroup.clientes_con_compras),body:'Cuentas de w_clientebase fuera de los grupos clasificados. El desglose de altas anteriores se presenta por separado.'}
   ]
   insights.innerHTML = insightCards.map(x => `<article class="intel-card ${x.tone}"><h3>${x.title}</h3><p><strong>${x.value}</strong><br>${x.body}</p></article>`).join('')
 }
